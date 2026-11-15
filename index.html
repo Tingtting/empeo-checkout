@@ -1104,7 +1104,7 @@ function Summary({
     key: a.id
   }, /*#__PURE__*/React.createElement("span", null, a.name, /*#__PURE__*/React.createElement("span", {
     className: "l-sub"
-  }, q.employees, " users \xD7 \u0E3F", a.price, " \xD7 ", q.months, " mo")), /*#__PURE__*/React.createElement("span", {
+  }, q.employees, " users \xD7 \u0E3F", a.price, " \xD7 ", q.months, " ", q.months === 1 ? "month" : "months")), /*#__PURE__*/React.createElement("span", {
     className: "amt"
   }, thb(a.amount)))), /*#__PURE__*/React.createElement("li", {
     className: "sub"
