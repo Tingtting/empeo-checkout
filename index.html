@@ -1,0 +1,2994 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex">
+<title>empeo Checkout Prototype</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Prompt:wght@400;500;600;700&family=Sarabun:wght@400;600&family=IBM+Plex+Mono:wght@500&display=swap">
+<style>
+/* Layout: wide two-column checkout (task column + sticky order summary); plan step is a 5-up card row.
+   CI taken from empeo.com (15 Nov 2026): orange #F05B2F, gradient pill CTAs, 26px rounded cards, green savings pills.
+   Single light theme on purpose, matching empeo.com. */
+:root {
+  --bg: #f6f6f8;
+  --surface: #ffffff;
+  --surface-2: #f6f6f8;
+  --line: #ececf1;
+  --line-strong: #d2d2da;
+  --fg: #1c1c22;
+  --muted: #525260;
+  --muted-2: #6a6a7c;
+  --accent: #f05b2f;
+  --accent-hover: #d94a20;
+  --accent-dark: #b5401a;
+  --accent-ink: #ffffff;
+  --accent-soft: #fef1ec;
+  --cta: linear-gradient(90deg, #f08a3f 0%, #f0704b 50%, #f0485f 100%);
+  --ink-dark: #232038;
+  --pop: #f05b2f;
+  --ok: #008f6b;
+  --ok-fill: #00c291;
+  --ok-soft: #e3f8f1;
+  --info: #0071cc;
+  --info-soft: #e8f4ff;
+  --warn: #9a5a00;
+  --warn-soft: #fff3dc;
+  --err: #d42c3a;
+  --err-soft: #fdecee;
+  --sample: #6b4bc4;
+  --sample-soft: #f1ecfc;
+  --shadow: 0 2px 6px rgba(28,28,34,.04), 0 12px 32px rgba(28,28,34,.06);
+  --shadow-pop: 0 12px 32px rgba(240,91,47,.14);
+  --f-display: "Prompt", "Sarabun", system-ui, sans-serif;
+  --f-body: "Prompt", "Sarabun", system-ui, -apple-system, "Segoe UI", sans-serif;
+  --f-mono: "IBM Plex Mono", ui-monospace, Menlo, monospace;
+  --r: 20px;
+  --r-lg: 26px;
+  --r-sm: 12px;
+  color-scheme: light;
+}
+* { box-sizing: border-box; }
+html, body { margin: 0; }
+body { background: var(--bg); color: var(--fg); font: 400 15px/1.6 var(--f-body); -webkit-font-smoothing: antialiased; }
+h1, h2, h3 { font-family: var(--f-display); line-height: 1.25; margin: 0; text-wrap: balance; color: var(--fg); }
+h1 { font-size: 32px; font-weight: 700; }
+h2 { font-size: 20px; font-weight: 600; }
+h3 { font-size: 16px; font-weight: 600; }
+p { margin: 0; }
+.num { font-variant-numeric: tabular-nums; }
+button, input, select, textarea { font: inherit; color: inherit; }
+:focus-visible { outline: 3px solid var(--accent); outline-offset: 2px; border-radius: 6px; }
+@media (prefers-reduced-motion: reduce) { * { animation: none !important; transition: none !important; } }
+
+.wrap { max-width: 1260px; margin: 0 auto; padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); }
+
+/* Banner + header */
+.proto-banner { background: var(--sample-soft); color: var(--fg); font-size: 13px; border-bottom: 1px solid var(--line); }
+.proto-banner .wrap { display: flex; gap: 8px 14px; align-items: center; flex-wrap: wrap; padding-block: 8px; }
+.proto-banner b { color: var(--sample); }
+header.top { background: var(--surface); border-bottom: 1px solid var(--line); }
+header.top .wrap { display: flex; align-items: center; justify-content: space-between; gap: 16px; padding-block: 14px; flex-wrap: wrap; }
+.brand { display: flex; align-items: center; gap: 12px; }
+.brand small { padding-left: 12px; border-left: 1px solid var(--line-strong); }
+.wordmark { display: inline-flex; align-items: center; gap: 6px; font-family: var(--f-display); font-weight: 500; font-size: 26px; letter-spacing: -0.01em; color: var(--accent); line-height: 1; }
+.brand small { color: var(--muted); font-size: 13px; }
+.secure { display: flex; align-items: center; gap: 6px; color: var(--muted); font-size: 13px; }
+
+/* Stepper */
+.stepper { display: flex; gap: 4px; list-style: none; margin: 0; padding: 0; flex-wrap: wrap; }
+.stepper li button { display: flex; align-items: center; gap: 8px; background: none; border: 0; padding: 6px 10px; border-radius: 999px; font-size: 14px; color: var(--muted); cursor: default; }
+.stepper li button.done { color: var(--fg); cursor: pointer; }
+.stepper li button.done:hover { background: var(--surface-2); }
+.stepper li button[aria-current="step"] { color: var(--accent); font-weight: 600; background: var(--accent-soft); }
+.stepper .dot { width: 22px; height: 22px; border-radius: 50%; display: grid; place-items: center; font-size: 12px; font-weight: 600; border: 1.5px solid var(--line-strong); }
+.stepper .done .dot { background: var(--ok-fill); border-color: var(--ok-fill); color: #fff; }
+.stepper [aria-current="step"] .dot { border-color: var(--accent); background: var(--accent); color: var(--accent-ink); }
+
+main { padding-block: 28px 80px; }
+.page-head { display: flex; justify-content: space-between; align-items: flex-end; gap: 16px 24px; flex-wrap: wrap; margin-bottom: 20px; }
+.page-head p { color: var(--muted); margin-top: 6px; max-width: 62ch; }
+
+/* Chips / badges */
+.chip { display: inline-flex; align-items: center; gap: 4px; font-size: 12px; font-weight: 500; letter-spacing: .02em; padding: 3px 10px; border-radius: 999px; white-space: nowrap; }
+.chip.sample { background: var(--sample-soft); color: var(--sample); border: 1px dashed var(--sample); }
+.chip.pop { background: var(--pop); color: #fff; }
+.chip.rec { background: var(--ink-dark); color: #fff; }
+.chip.save { background: var(--ok-fill); color: #fff; }
+.chip.ok { background: var(--ok-fill); color: #fff; }
+.chip.warn { background: var(--warn-soft); color: var(--warn); }
+.chip.muted { background: var(--surface-2); color: var(--muted); }
+
+/* Buttons */
+.btn { display: inline-flex; align-items: center; justify-content: center; gap: 8px; border-radius: 999px; min-height: 44px; padding: 10px 20px; font-weight: 500; border: 1.5px solid transparent; cursor: pointer; transition: background .15s, border-color .15s; text-decoration: none; }
+.btn.primary { background: var(--cta); color: var(--accent-ink); box-shadow: 0 6px 16px rgba(240,91,47,.22); }
+.btn.primary:hover { filter: brightness(.95); }
+.btn.primary:disabled { opacity: .45; cursor: not-allowed; box-shadow: none; filter: none; }
+.btn.secondary { background: var(--surface); color: var(--accent); border-color: var(--accent); }
+.btn.secondary:hover { background: var(--accent-soft); }
+.btn.ghost { background: none; color: var(--accent); padding: 8px 14px; min-height: 40px; }
+.btn.ghost:hover { background: var(--accent-soft); }
+.btn.block { width: 100%; }
+.btn.lg { min-height: 52px; padding: 13px 22px; font-size: 16px; }
+.link { background: none; border: 0; color: var(--accent); padding: 0; cursor: pointer; font-weight: 500; text-decoration: underline; text-underline-offset: 2px; }
+
+/* Panels */
+.panel { background: var(--surface); border: 1px solid var(--line); border-radius: var(--r); padding: 24px; }
+.panel + .panel { margin-top: 16px; }
+.panel-head { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; margin-bottom: 14px; flex-wrap: wrap; }
+.panel-head p { color: var(--muted); font-size: 14px; }
+.layout { display: grid; grid-template-columns: minmax(0, 1fr) 380px; gap: 24px; align-items: start; }
+.layout > * { min-width: 0; }
+@media (max-width: 980px) { .layout { grid-template-columns: 1fr; } }
+
+/* Plan step */
+.finder { display: grid; grid-template-columns: minmax(0, 1fr); gap: 22px; background: var(--surface); border: 1px solid var(--line); border-radius: var(--r); padding: 20px 24px; margin-bottom: 18px; }
+@media (max-width: 900px) { .finder { grid-template-columns: 1fr; } }
+.finder > * { min-width: 0; }
+.finder-label { font-size: 14px; font-weight: 500; color: var(--fg); margin-bottom: 8px; display: block; }
+.need-opts { display: flex; flex-wrap: wrap; gap: 8px; }
+.need { display: inline-flex; align-items: center; gap: 6px; border: 1.5px solid var(--line-strong); background: var(--surface); border-radius: 999px; padding: 7px 16px; cursor: pointer; font-size: 14px; }
+.need:hover { border-color: var(--accent); }
+.need[aria-pressed="true"] { background: var(--accent-soft); border-color: var(--accent); color: var(--accent); font-weight: 500; }
+.seg { display: inline-flex; background: var(--surface); border: 1px solid var(--line-strong); border-radius: 999px; padding: 4px; gap: 2px; flex-wrap: wrap; }
+.seg button { border: 0; background: none; padding: 8px 16px; border-radius: 999px; cursor: pointer; font-size: 14px; color: var(--muted); display: flex; gap: 6px; align-items: center; }
+.seg button[aria-checked="true"] { background: var(--accent); color: #fff; font-weight: 500; }
+.seg .save { font-size: 11.5px; color: #fff; background: var(--ok-fill); border-radius: 999px; padding: 1px 8px; font-weight: 500; }
+.finder-hc { }
+.helper { border-top: 1px solid var(--line); padding-top: 18px; display: grid; gap: 12px; }
+.helper-head { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; }
+.helper-head .finder-label { margin: 0; }
+.helper-collapsed { border-top: 1px solid var(--line); padding-top: 14px; }
+.rec-result { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; min-height: 34px; font-size: 14px; }
+.rec-result > span:nth-child(2) { flex: 1 1 260px; min-width: 0; }
+.rec-dot { width: 24px; height: 24px; border-radius: 50%; background: var(--ink-dark); color: #fff; display: grid; place-items: center; flex: none; }
+.rec-actions { display: flex; gap: 14px; }
+.finder-hc-head { display: flex; justify-content: space-between; align-items: baseline; gap: 6px 16px; flex-wrap: wrap; }
+.finder-hc-head .finder-label { margin: 0; }
+/* Headcount slider (หลอด), modelled on empeo.com's pricing slider */
+.hc-wrap { display: grid; gap: 4px; }
+.hc-entry { display: flex; align-items: center; gap: 8px 12px; flex-wrap: wrap; margin-top: 10px; }
+.hc-entry .stepper-input { border-color: var(--accent); box-shadow: 0 2px 8px rgba(240,91,47,.12); }
+.hc-entry .stepper-input.focused { box-shadow: 0 0 0 4px var(--accent-soft); }
+.hc-entry .stepper-input input { width: 72px; font-size: 18px; font-weight: 700; color: var(--fg); cursor: text; }
+.hc-entry .stepper-input input:hover { background: var(--accent-soft); }
+.hc-entry .stepper-input button:disabled { color: var(--line-strong); cursor: not-allowed; background: var(--surface); }
+.hc-entry-unit { font-weight: 500; }
+.hc-hint { display: inline-flex; align-items: center; gap: 5px; font-size: 12.5px; color: var(--muted-2); }
+.hc-tip button { display: inline-flex; align-items: center; gap: 4px; }
+.hc-slider { padding: 58px 4px 0; }
+.hc-rail { position: relative; }
+.hc-tip { --shift: 0%; position: absolute; bottom: calc(100% + 12px); transform: translateX(calc(-50% - var(--shift))); display: inline-flex; align-items: center; gap: 6px; white-space: nowrap; background: var(--accent); color: #fff; border-radius: var(--r-sm); padding: 4px 12px; z-index: 3; transition: left .12s ease-out, background .2s; box-shadow: 0 6px 14px rgba(240,91,47,.28); }
+.hc-tip:hover, .hc-tip.editing { background: var(--accent-hover); }
+.hc-tip::after { content: ""; position: absolute; left: calc(50% + var(--shift)); top: 100%; transform: translateX(-50%); border: 8px solid transparent; border-bottom: 0; border-top-color: inherit; border-top-color: var(--accent); }
+.hc-tip:hover::after, .hc-tip.editing::after { border-top-color: var(--accent-hover); }
+.hc-tip button { background: none; border: 0; color: #fff; padding: 0; cursor: text; font: inherit; font-weight: 700; font-size: 17px; border-bottom: 2px solid rgba(255,255,255,.85); line-height: 1.5; font-variant-numeric: tabular-nums; }
+.hc-tip input { width: 4.4ch; border: 0; border-bottom: 2px solid #fff; background: transparent; color: #fff; font: inherit; font-weight: 700; font-size: 17px; text-align: center; padding: 0; outline: none; line-height: 1.5; }
+.hc-unit { font-weight: 600; font-size: 14px; }
+.hc-range { -webkit-appearance: none; appearance: none; display: block; width: 100%; height: 30px; margin: 0; background: transparent; cursor: pointer; }
+.hc-range:focus { outline: none; }
+.hc-range::-webkit-slider-runnable-track { height: 12px; border-radius: 999px; background: linear-gradient(90deg, #f36b42 0, #f7a07b var(--p), var(--line) var(--p), var(--line) 100%); }
+.hc-range::-moz-range-track { height: 12px; border-radius: 999px; background: var(--line); }
+.hc-range::-moz-range-progress { height: 12px; border-radius: 999px; background: linear-gradient(90deg, #f36b42, #f7a07b); }
+.hc-range::-webkit-slider-thumb { -webkit-appearance: none; width: 30px; height: 30px; margin-top: -9px; border-radius: 50%; background: #fff; border: 7px solid var(--accent); box-shadow: 0 4px 10px rgba(240,91,47,.35); transition: transform .15s; }
+.hc-range::-moz-range-thumb { width: 16px; height: 16px; border-radius: 50%; background: #fff; border: 7px solid var(--accent); box-shadow: 0 4px 10px rgba(240,91,47,.35); }
+.hc-range:active::-webkit-slider-thumb { transform: scale(1.12); }
+.hc-range:focus-visible::-webkit-slider-thumb { box-shadow: 0 0 0 5px var(--accent-soft), 0 4px 10px rgba(240,91,47,.35); }
+.hc-ticks { position: relative; height: 26px; margin-top: 8px; }
+.hc-ticks button { position: absolute; top: 0; transform: translateX(-50%); background: none; border: 0; padding: 2px 4px; font: inherit; font-size: 13px; color: var(--muted-2); cursor: pointer; font-variant-numeric: tabular-nums; }
+.hc-ticks button.on { color: var(--fg); }
+.hc-ticks button:hover { color: var(--accent); }
+@media (max-width: 560px) { .hc-ticks button:nth-child(odd):not(:last-child) { display: none; } }
+.headcount-row { display: flex; gap: 12px; align-items: center; flex-wrap: wrap; }
+.stepper-input { display: inline-flex; align-items: stretch; border: 1.5px solid var(--line-strong); border-radius: 999px; overflow: hidden; background: var(--surface); }
+.stepper-input button { width: 42px; border: 0; background: var(--surface); color: var(--accent); cursor: pointer; font-size: 20px; line-height: 1; }
+.stepper-input button:hover { background: var(--accent-soft); color: var(--accent); }
+.stepper-input input { width: 64px; border: 0; border-inline: 1px solid var(--line); text-align: center; padding: 9px 4px; background: transparent; font-variant-numeric: tabular-nums; font-weight: 500; -moz-appearance: textfield; appearance: textfield; }
+.stepper-input input:focus { outline: none; background: var(--accent-soft); }
+input[type="number"]::-webkit-inner-spin-button, input[type="number"]::-webkit-outer-spin-button { -webkit-appearance: none; margin: 0; }
+input[type="number"] { -moz-appearance: textfield; appearance: textfield; }
+.band-note { font-size: 13px; color: var(--muted); }
+
+.plans { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 12px; align-items: stretch; }
+@media (max-width: 1180px) { .plans { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
+@media (max-width: 760px) { .plans { display: flex; overflow-x: auto; scroll-snap-type: x mandatory; gap: 12px; padding: 10px 2px 14px; margin-inline: -2px; scrollbar-width: thin; } .plans > .plan { flex: 0 0 84%; scroll-snap-align: center; } .plan:hover { transform: none; } }
+.plan { position: relative; display: flex; flex-direction: column; background: var(--surface); border: 1px solid var(--line); border-radius: var(--r-lg); padding: 22px 18px 18px; gap: 14px; transition: border-color .15s, box-shadow .15s; }
+.plan { isolation: isolate; transition: transform .25s cubic-bezier(.2,.8,.2,1), box-shadow .25s, border-color .25s; }
+.plan::before { content: ""; position: absolute; inset: 0; border-radius: inherit; z-index: -1; pointer-events: none; opacity: 0; transition: opacity .25s;
+  background: radial-gradient(120% 55% at 50% 0%, rgba(247,160,123,.28) 0%, rgba(240,91,47,.08) 45%, transparent 75%); }
+.plan:hover, .plan:focus-within { transform: translateY(-6px); border-color: transparent; box-shadow: inset 0 0 0 2px var(--accent), 0 18px 40px rgba(240,91,47,.22); }
+.plan:hover::before, .plan:focus-within::before, .plan.popular::before { opacity: 1; }
+.plan.popular { border-color: transparent; box-shadow: inset 0 0 0 2px var(--accent), var(--shadow-pop); }
+.plan.recommended { border-color: transparent; box-shadow: inset 0 0 0 2px var(--ink-dark), var(--shadow); }
+.plan.popular.recommended { box-shadow: inset 0 0 0 2px var(--accent), 0 0 0 4px var(--accent-soft), var(--shadow-pop); }
+.plan .flags { display: flex; gap: 6px; min-height: 26px; flex-wrap: wrap; }
+.plan .rec-ribbon { position: absolute; top: -12px; left: 50%; transform: translateX(-50%); white-space: nowrap; box-shadow: 0 4px 10px rgba(35,32,56,.25); }
+.plan-name { font-family: var(--f-display); font-size: 24px; font-weight: 700; }
+.best { color: var(--muted); font-size: 13.5px; min-height: 86px; margin-top: 4px; }
+.best-label { display: block; font-size: 11.5px; font-weight: 600; letter-spacing: .06em; text-transform: uppercase; color: var(--accent); margin-bottom: 2px; }
+.chip.suite { background: var(--ink-dark); color: #fff; }
+.plan.flash { animation: flash 1.2s ease-out; }
+@keyframes flash { 0%, 60% { box-shadow: inset 0 0 0 2px var(--ink-dark), 0 0 0 8px rgba(240,91,47,.25); } }
+.plan .benefits { border-top: 1px solid var(--line); padding-top: 14px; }
+.plan .cta { margin-top: 0 !important; }
+.price-block { min-height: 92px; }
+.compare-bar { display: flex; align-items: center; justify-content: center; gap: 8px 16px; flex-wrap: wrap; margin-top: 22px; text-align: center; }
+.cmp-anchor { scroll-margin-top: 16px; }
+.compare { margin-top: 18px; background: var(--surface); border: 1px solid var(--line); border-radius: var(--r-lg); padding: 22px 22px 18px; box-shadow: var(--shadow); }
+.cmp-toolbar { display: flex; justify-content: space-between; align-items: flex-start; gap: 12px 20px; flex-wrap: wrap; margin-bottom: 14px; }
+.cmp-toolbar p { margin-top: 4px; max-width: 70ch; }
+.cmp-controls { display: flex; gap: 14px; align-items: center; }
+.cmp-controls .toggle { align-items: center; }
+.cmp-controls .toggle .sw { margin-top: 0; }
+.cmp-controls .toggle input:checked + .sw { background: var(--accent); }
+.cmp-pick { display: grid; grid-template-columns: minmax(0,1fr) auto minmax(0,1fr); gap: 8px; align-items: center; margin-bottom: 10px; }
+.cmp-pick select { border: 1.5px solid var(--line-strong); border-radius: 999px; padding: 9px 14px; background: var(--surface); font-weight: 500; width: 100%; }
+.cmp-table { width: 100%; border-collapse: separate; border-spacing: 0; table-layout: fixed; font-size: 14px; }
+.cmp-table col.c-feat { width: 26%; }
+.cmp-table th, .cmp-table td { padding: 11px 10px; border-bottom: 1px solid var(--line); text-align: center; vertical-align: middle; }
+.cmp-table tbody th { text-align: left; font-weight: 400; color: var(--fg); }
+.cmp-table thead th { position: sticky; top: 0; z-index: 2; background: var(--surface); border-bottom: 1.5px solid var(--line-strong); vertical-align: bottom; padding-top: 14px; }
+.cmp-table thead th.c-feat { text-align: left; }
+.cmp-name { display: block; font-family: var(--f-display); font-size: 17px; font-weight: 700; }
+.cmp-price { display: block; font-weight: 600; font-variant-numeric: tabular-nums; margin-top: 2px; }
+.cmp-price small { font-weight: 400; color: var(--muted); font-size: 12px; }
+.cmp-table thead .chip { margin: 2px 0; }
+.cmp-table td.pop { background: rgba(240,91,47,.035); }
+.cmp-table thead th.pop { background: #fff8f5; }
+.cmp-table td.rec { background: rgba(35,32,56,.04); }
+.cmp-table thead th.rec { background: #f4f3f7; }
+.cmp-table tbody tr:hover > * { background: var(--surface-2); }
+.cmp-table tfoot td, .cmp-table tfoot th { border-bottom: 0; padding-top: 16px; }
+.cmp-table tfoot .btn { padding-inline: 8px; }
+.cmp-table td { transition: opacity .2s; }
+.cmp-table td.same, .cmp-table td.base { opacity: .28; }
+.cmp-table tbody tr:hover > td.same, .cmp-table tbody tr:hover > td.base { opacity: .7; }
+.cv.yes.up { flex-direction: column; gap: 2px; }
+.cv.up .tick { width: 26px; height: 26px; border-radius: 50%; background: var(--cta); color: #fff; display: grid; place-items: center; box-shadow: 0 4px 10px rgba(240,91,47,.35); }
+.cv.up .new-lbl { font-size: 10.5px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; color: var(--accent); }
+.cv.txt.up { background: var(--cta); color: #fff; font-weight: 600; border-radius: 10px; padding: 4px 10px; box-shadow: 0 4px 10px rgba(240,91,47,.3); }
+.cv.add.up { border: 1.5px solid var(--accent); color: var(--accent); font-weight: 600; background: var(--surface); }
+.up-count { display: inline-block; margin-top: 6px; font-size: 12px; font-weight: 700; color: #fff; background: var(--accent); border-radius: 999px; padding: 2px 10px; white-space: nowrap; }
+.up-count.base { background: var(--surface-2); color: var(--muted); font-weight: 500; }
+.diff-note { display: flex; gap: 10px; align-items: flex-start; background: var(--accent-soft); border-radius: var(--r-sm); padding: 10px 14px; margin-bottom: 12px; font-size: 13.5px; }
+.diff-swatch { flex: none; width: 18px; height: 18px; margin-top: 2px; border-radius: 50%; background: var(--cta); }
+.cv { display: inline-flex; align-items: center; justify-content: center; gap: 1px; }
+.cv.yes { color: var(--accent); font-weight: 700; }
+.cv.no { color: var(--line-strong); font-size: 18px; }
+.cv.add { font-size: 12px; color: var(--muted); border: 1px solid var(--line-strong); border-radius: 999px; padding: 1px 8px; white-space: nowrap; }
+.cv.txt { font-size: 13px; line-height: 1.35; }
+.grp th, .grp td { background: var(--surface-2); }
+.grp th button { display: flex; align-items: center; gap: 6px; background: none; border: 0; padding: 0; font: inherit; font-weight: 600; color: var(--fg); cursor: pointer; text-align: left; }
+.grp th button .chev { flex: none; transition: transform .15s; color: var(--accent); }
+.grp th button[aria-expanded="true"] .chev { transform: rotate(90deg); }
+.cmp-table tr.sub th { padding-left: 30px; color: var(--muted); }
+.cmp-empty { text-align: center !important; padding: 20px !important; }
+.cmp-more { display: flex; justify-content: center; align-items: center; gap: 16px; flex-wrap: wrap; margin-top: 16px; }
+.cmp-legend { display: flex; flex-wrap: wrap; gap: 6px 18px; justify-content: center; margin-top: 14px; }
+.cmp-legend > span { display: inline-flex; align-items: center; gap: 6px; }
+@media (max-width: 720px) {
+  .compare { padding: 16px 12px; border-radius: var(--r); }
+  .cmp-table col.c-feat { width: 40%; }
+  .cmp-table th, .cmp-table td { padding: 10px 6px; font-size: 13px; }
+  .cmp-table tr.sub th { padding-left: 14px; }
+  .cmp-name { font-size: 15px; }
+}
+.price { display: flex; align-items: baseline; gap: 4px; }
+.price strong { font-family: var(--f-display); font-size: 28px; font-weight: 700; font-variant-numeric: tabular-nums; }
+.price span { color: var(--muted); font-size: 13px; }
+.billed { color: var(--muted); font-size: 12.5px; min-height: 38px; }
+.billed .save { display: inline-block; margin-top: 4px; color: #fff; background: var(--ok-fill); border-radius: 999px; padding: 1px 8px; font-weight: 500; font-size: 12px; }
+.plan ul { list-style: none; padding: 0; margin: 0; display: grid; gap: 7px; font-size: 13.5px; }
+.plan ul li { display: flex; gap: 8px; align-items: flex-start; }
+.plan ul li svg { flex: none; margin-top: 4px; color: var(--accent); }
+.plan .prefix { font-size: 13.5px; font-weight: 600; color: var(--fg); margin-bottom: 6px; }
+.plan .cta { margin-top: auto; display: grid; gap: 6px; }
+.custom-price { font-family: var(--f-display); font-size: 22px; font-weight: 700; }
+.foot-note { margin-top: 16px; color: var(--muted); font-size: 13px; display: flex; gap: 6px 16px; flex-wrap: wrap; }
+
+/* Configure */
+.addons { display: grid; gap: 8px; }
+.addon { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; gap: 12px; align-items: center; border: 1.5px solid var(--line); border-radius: var(--r-sm); padding: 14px 16px; cursor: pointer; }
+.addon:hover { border-color: var(--line-strong); }
+.addon.on { border-color: var(--accent); background: var(--accent-soft); }
+.addon.included { cursor: default; background: var(--surface-2); }
+.addon input { width: 18px; height: 18px; accent-color: var(--accent); }
+.addon .a-name { font-weight: 600; }
+.addon .a-desc { color: var(--muted); font-size: 13px; }
+.addon .a-price { text-align: right; font-size: 13px; color: var(--muted); }
+.addon .a-price b { color: var(--fg); font-size: 14px; display: block; }
+.billing-opts { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; }
+@media (max-width: 640px) { .billing-opts { grid-template-columns: 1fr; } }
+.bopt { text-align: left; border: 1.5px solid var(--line-strong); border-radius: var(--r-sm); padding: 12px 14px; background: var(--surface); cursor: pointer; display: grid; gap: 2px; }
+.bopt:hover { border-color: var(--accent); }
+.bopt[aria-checked="true"] { border-color: var(--accent); background: var(--accent-soft); }
+.bopt .b-t { font-weight: 600; display: flex; justify-content: space-between; gap: 8px; }
+.bopt .b-p { font-variant-numeric: tabular-nums; font-size: 14px; }
+.bopt .b-s { font-size: 12.5px; color: var(--muted); }
+.band-bar { margin-top: 12px; display: grid; gap: 6px; }
+.band-track { height: 8px; background: var(--surface-2); border-radius: 99px; overflow: hidden; }
+.band-fill { height: 100%; background: var(--accent); border-radius: 99px; transition: width .2s; }
+.band-meta { display: flex; justify-content: space-between; font-size: 12.5px; color: var(--muted); gap: 8px; flex-wrap: wrap; }
+.current-plan { display: flex; justify-content: space-between; align-items: center; gap: 12px; flex-wrap: wrap; }
+
+/* Summary */
+.summary { position: sticky; top: 16px; background: var(--surface); border: 1px solid var(--line); border-radius: var(--r); box-shadow: var(--shadow); overflow: hidden; }
+.summary .s-head { padding: 18px 20px 12px; border-bottom: 1px solid var(--line); }
+.summary .s-plan { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; margin-top: 4px; }
+.summary .s-plan b { font-family: var(--f-display); font-size: 20px; }
+.summary .s-meta { color: var(--muted); font-size: 13px; }
+.lines { list-style: none; margin: 0; padding: 14px 20px; display: grid; gap: 10px; font-size: 14px; }
+.lines li { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 12px; align-items: baseline; }
+.lines li .l-sub { display: block; color: var(--muted); font-size: 12.5px; }
+.lines li .amt { font-variant-numeric: tabular-nums; text-align: right; white-space: nowrap; }
+.lines li.disc .amt { color: var(--ok); font-weight: 500; }
+.lines li.sub { border-top: 1px solid var(--line); padding-top: 10px; }
+.due { padding: 16px 20px; background: var(--accent-soft); display: flex; justify-content: space-between; align-items: baseline; gap: 10px; border-top: 1px solid var(--line); }
+.due .due-label { font-weight: 500; }
+.due .due-label small { display: block; font-weight: 400; color: var(--muted); font-size: 12.5px; }
+.due .due-amt { font-family: var(--f-display); font-size: 26px; font-weight: 700; font-variant-numeric: tabular-nums; color: var(--fg); }
+.s-notes { padding: 12px 20px 16px; display: grid; gap: 6px; font-size: 12.5px; color: var(--muted); }
+.s-notes div { display: flex; gap: 8px; }
+.s-cta { padding: 0 20px 18px; display: grid; gap: 8px; }
+
+/* Forms */
+.form-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px 16px; }
+.form-grid .full { grid-column: 1 / -1; }
+@media (max-width: 640px) { .form-grid { grid-template-columns: 1fr; } }
+.field { display: grid; gap: 5px; }
+.field label { font-size: 13.5px; font-weight: 500; }
+.field .hint { font-size: 12.5px; color: var(--muted); }
+.field input, .field select, .field textarea { border: 1.5px solid var(--line-strong); border-radius: var(--r-sm); padding: 11px 14px; background: var(--surface); width: 100%; }
+.field input:focus, .field select:focus, .field textarea:focus { outline: none; border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-soft); }
+.field.invalid input { border-color: var(--err); }
+.field .err { color: var(--err); font-size: 12.5px; }
+.check { display: flex; gap: 10px; align-items: flex-start; font-size: 14px; }
+.check input { width: 18px; height: 18px; margin-top: 2px; accent-color: var(--accent); flex: none; }
+
+/* Payment */
+.methods { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; margin-bottom: 18px; }
+@media (max-width: 560px) { .methods { grid-template-columns: 1fr; } }
+.method { display: flex; gap: 12px; align-items: center; text-align: left; border: 1.5px solid var(--line-strong); border-radius: var(--r-sm); padding: 14px 16px; background: var(--surface); cursor: pointer; }
+.method:hover { border-color: var(--accent); }
+.method[aria-checked="true"] { border-color: var(--accent); background: var(--accent-soft); }
+.method .m-icon { width: 40px; height: 40px; border-radius: 50%; background: var(--surface); display: grid; place-items: center; color: var(--accent); flex: none; }
+.method .m-t { font-weight: 500; }
+.method .m-s { font-size: 12.5px; color: var(--muted); }
+.alert { border-radius: var(--r-sm); padding: 14px 16px; display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 12px; margin-bottom: 16px; }
+.alert.err { background: var(--err-soft); border: 1px solid var(--err); }
+.alert.err .a-icon { color: var(--err); }
+.alert.ok { background: var(--ok-soft); border: 1px solid var(--ok); }
+.alert.ok .a-icon { color: var(--ok); }
+.alert.info { background: var(--info-soft); border: 1px solid var(--info); }
+.alert.info .a-icon { color: var(--info); }
+.alert h3 { font-size: 15px; }
+.alert p { font-size: 14px; margin-top: 2px; }
+.alert .a-actions { display: flex; gap: 8px; margin-top: 10px; flex-wrap: wrap; }
+.test-cards { font-size: 12.5px; color: var(--muted); background: var(--surface-2); border-radius: var(--r-sm); padding: 10px 12px; display: flex; gap: 6px 12px; flex-wrap: wrap; align-items: center; margin-top: 14px; }
+.test-cards code { font-family: var(--f-mono); font-size: 12px; }
+.card-input { position: relative; }
+.card-input .brand-tag { position: absolute; right: 10px; top: 50%; transform: translateY(-50%); font-size: 11px; font-weight: 700; letter-spacing: .05em; text-transform: uppercase; color: var(--muted); }
+.mono { font-family: var(--f-mono); letter-spacing: .02em; }
+.bank-steps { list-style: none; padding: 0; margin: 0; display: grid; gap: 16px; }
+.bank-steps > li { display: grid; grid-template-columns: 28px minmax(0, 1fr); gap: 12px; }
+.bank-steps .n { width: 28px; height: 28px; border-radius: 50%; background: var(--accent-soft); color: var(--accent); display: grid; place-items: center; font-weight: 700; font-size: 13px; }
+.kv { display: grid; grid-template-columns: max-content minmax(0, 1fr) auto; gap: 8px 14px; align-items: center; background: var(--surface-2); border-radius: var(--r-sm); padding: 12px 14px; margin-top: 8px; font-size: 14px; }
+.kv dt { color: var(--muted); }
+.kv dd { margin: 0; font-weight: 500; overflow-wrap: anywhere; }
+.copy { font-size: 12.5px; padding: 4px 12px; border-radius: 999px; border: 1.5px solid var(--accent); color: var(--accent); background: var(--surface); cursor: pointer; }
+.copy:hover { background: var(--accent-soft); }
+.drop { margin-top: 8px; border: 1.5px dashed var(--line-strong); border-radius: var(--r-sm); padding: 22px; text-align: center; display: grid; gap: 6px; justify-items: center; background: var(--surface); cursor: pointer; transition: border-color .15s, background .15s; }
+.drop:hover, .drop.over { border-color: var(--accent); background: var(--accent-soft); }
+.drop.bad { border-color: var(--err); background: var(--err-soft); }
+.drop svg { color: var(--accent); }
+.drop .d-sub { font-size: 12.5px; color: var(--muted); }
+.file-row { margin-top: 8px; display: grid; grid-template-columns: 56px minmax(0, 1fr) auto; gap: 12px; align-items: center; border: 1px solid var(--ok-fill); background: var(--ok-soft); border-radius: var(--r-sm); padding: 10px 12px; }
+.file-row.loading { border-color: var(--line-strong); background: var(--surface); }
+.thumb { width: 56px; height: 56px; border-radius: 6px; background: var(--surface-2); display: grid; place-items: center; overflow: hidden; color: var(--muted); font-size: 11px; font-weight: 700; }
+.thumb img { width: 100%; height: 100%; object-fit: cover; }
+.progress { height: 6px; border-radius: 99px; background: var(--surface-2); overflow: hidden; margin-top: 6px; }
+.progress > div { height: 100%; background: var(--accent); transition: width .1s linear; }
+.spinner { width: 16px; height: 16px; border-radius: 50%; border: 2px solid currentColor; border-right-color: transparent; animation: spin .7s linear infinite; }
+@keyframes spin { to { transform: rotate(360deg); } }
+
+/* Done */
+.done-wrap { max-width: 860px; margin: 0 auto; }
+.done-hero { text-align: center; display: grid; justify-items: center; gap: 10px; padding: 12px 0 24px; }
+.done-hero .big-icon { width: 64px; height: 64px; border-radius: 50%; display: grid; place-items: center; }
+.done-hero .big-icon.ok { background: var(--ok-fill); color: #fff; }
+.done-hero .big-icon.wait { background: var(--warn-soft); color: var(--warn); }
+.done-hero p { color: var(--muted); max-width: 56ch; }
+.done-grid { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 16px; align-items: stretch; }
+.done-grid > .panel { margin: 0; height: 100%; display: flex; flex-direction: column; }
+.done-grid > .panel .push-end { margin-top: auto; padding-top: 18px; }
+@media (max-width: 760px) { .done-grid { grid-template-columns: 1fr; } }
+.timeline { list-style: none; padding: 0; margin: 0; display: grid; gap: 0; }
+.timeline li { display: grid; grid-template-columns: 24px minmax(0, 1fr); gap: 12px; padding-bottom: 14px; position: relative; }
+.timeline li:not(:last-child)::before { content: ""; position: absolute; left: 11px; top: 24px; bottom: 0; width: 2px; background: var(--line); }
+.timeline .t-dot { width: 24px; height: 24px; border-radius: 50%; display: grid; place-items: center; border: 2px solid var(--line-strong); background: var(--surface); }
+.timeline .t-dot.ok { background: var(--ok-fill); border-color: var(--ok-fill); color: #fff; }
+.timeline .t-dot.now { border-color: var(--warn); color: var(--warn); }
+.timeline .t-sub { font-size: 13px; color: var(--muted); }
+.next-list { list-style: none; padding: 0; margin: 0; display: grid; gap: 10px; }
+.next-list li { display: flex; gap: 10px; align-items: flex-start; font-size: 14px; }
+.next-list li svg { color: var(--accent); flex: none; margin-top: 2px; }
+.receipt { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 6px 12px; font-size: 14px; }
+.receipt dt { color: var(--muted); }
+.receipt dd { margin: 0; text-align: right; font-variant-numeric: tabular-nums; font-weight: 500; }
+
+/* Dialog, toast, controls */
+.overlay { position: fixed; inset: 0; display: grid; place-items: center; padding: 16px; z-index: 50; animation: ov-in .2s ease-out;
+  background: radial-gradient(80% 60% at 50% 40%, rgba(240,91,47,.18), transparent 70%), rgba(28,28,34,.55);
+  -webkit-backdrop-filter: blur(6px) saturate(120%); backdrop-filter: blur(6px) saturate(120%); }
+@keyframes ov-in { from { opacity: 0; } to { opacity: 1; } }
+@keyframes dlg-in { from { opacity: 0; transform: translateY(12px) scale(.98); } to { opacity: 1; transform: none; } }
+.dialog { animation: dlg-in .25s cubic-bezier(.2,.8,.2,1); position: relative; overflow: hidden; background: linear-gradient(180deg, var(--accent-soft) 0, var(--surface) 140px); border-radius: var(--r-lg); max-width: 560px; width: 100%; max-height: calc(100vh - 32px); overflow: auto; padding: 24px; box-shadow: 0 20px 60px rgba(0,0,0,.3); }
+.dialog .d-head { display: flex; justify-content: space-between; gap: 12px; align-items: flex-start; margin-bottom: 14px; }
+.icon-btn { border: 0; background: var(--surface-2); width: 32px; height: 32px; border-radius: 8px; cursor: pointer; display: grid; place-items: center; flex: none; }
+.toast { position: fixed; left: 50%; bottom: calc(24px + env(safe-area-inset-bottom, 0px)); transform: translateX(-50%); background: var(--fg); color: var(--bg); padding: 10px 16px; border-radius: 8px; font-size: 14px; z-index: 60; box-shadow: var(--shadow); max-width: calc(100vw - 32px); }
+.proto-ctrl { position: fixed; right: calc(16px + env(safe-area-inset-right, 0px)); bottom: calc(16px + env(safe-area-inset-bottom, 0px)); z-index: 40; display: grid; justify-items: end; gap: 8px; }
+.proto-ctrl .pc-btn { background: var(--sample); color: #fff; border: 0; border-radius: 999px; padding: 9px 14px; font-weight: 600; font-size: 13px; cursor: pointer; box-shadow: var(--shadow); display: flex; gap: 6px; align-items: center; }
+.proto-ctrl .pc-panel { background: var(--surface); border: 1px solid var(--sample); border-radius: 12px; padding: 16px; width: min(340px, calc(100vw - 32px)); box-shadow: var(--shadow); display: grid; gap: 12px; font-size: 13.5px; }
+.toggle { display: flex; gap: 10px; align-items: flex-start; cursor: pointer; }
+.toggle .sw { flex: none; width: 36px; height: 20px; border-radius: 99px; background: var(--line-strong); position: relative; transition: background .15s; margin-top: 2px; }
+.toggle .sw::after { content: ""; position: absolute; top: 2px; left: 2px; width: 16px; height: 16px; border-radius: 50%; background: #fff; transition: transform .15s; }
+.toggle input { position: absolute; opacity: 0; width: 1px; height: 1px; }
+.toggle input:checked + .sw { background: var(--sample); }
+.toggle input:checked + .sw::after { transform: translateX(16px); }
+.toggle input:focus-visible + .sw { outline: 3px solid var(--accent); outline-offset: 2px; }
+.sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+.back-row { display: flex; justify-content: space-between; align-items: center; gap: 12px; margin-top: 16px; flex-wrap: wrap; }
+.muted { color: var(--muted); }
+.small { font-size: 13px; }
+</style>
+</head>
+<body>
+<div id="root"></div>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/react/18.2.0/umd/react.production.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.2.0/umd/react-dom.production.min.js"></script>
+<script>
+const {
+  useState,
+  useEffect,
+  useMemo,
+  useRef,
+  useCallback
+} = React;
+
+/* ------------------------------------------------------------------
+   DATA
+   VERIFIED (empeo.com/en/pricing, checked 15 Nov 2026):
+   - plan names, taglines, the full headcount band price table (1–500 employees)
+   - "Yearly = monthly price x 10", "Quarterly = monthly price x 3 x 0.95"
+   - add-on prices per user per month, prices exclude 7% VAT
+   - implementation free up to 100 employees; >500 employees = custom quote
+   SAMPLE / ASSUMED: bank details,
+   payment methods, review SLA, company details, add-on discount rules.
+------------------------------------------------------------------- */
+const VERIFIED_DATE = "15 Nov 2026";
+const VAT_RATE = 0.07;
+
+// Plan names, badges and benefits verified against empeo.com/en/pricing (cards + #cmpData). "Best for" lines are our wording.
+const PLANS = [{
+  id: "lite",
+  name: "Lite",
+  annual: 13900,
+  bestFor: "Small businesses getting time, leave and shifts in order",
+  prefix: "Key features",
+  highlights: ["Time attendance by card, fingerprint, palm or face scan", "Shifts, leave and employee self-service", "Recruitment page with 3 open positions"]
+}, {
+  id: "basic",
+  name: "Basic",
+  annual: 28900,
+  bestFor: "Companies ready to run payroll in the same system",
+  prefix: "Everything in Lite, plus",
+  highlights: ["Payroll with social security, provident fund and tax", "e-Payslips sent by email", "HR dashboard and payroll reports"]
+}, {
+  id: "pro",
+  name: "Pro",
+  annual: 69900,
+  bestFor: "Growing teams adding expense claims, reviews and training",
+  prefix: "Everything in Basic, plus",
+  highlights: ["360° performance management", "Claims & expenses and asset management", "Phone support, Mon–Fri business hours"]
+}, {
+  id: "proplus",
+  name: "Pro+",
+  annual: 97900,
+  popular: true,
+  badge: "Most popular",
+  bestFor: "Fast-growing organizations managing goals and engagement",
+  prefix: "Everything in Pro, plus",
+  highlights: ["Goals with KPI & OKR", "Employee engagement and timesheet", "2FA, Azure AD and custom domain"]
+}, {
+  id: "ent",
+  name: "Enterprise",
+  annual: 179000,
+  badge: "Full suite",
+  bestFor: "Larger organizations that need AI, planning and integrations",
+  prefix: "Everything in Pro+, plus",
+  highlights: ["AI features such as AI rosters and course builder", "Workforce planning, career path & succession", "Open API and Power BI dashboards"]
+}];
+
+// Needs-based helper. level = index of the first plan that includes the feature (from #cmpData).
+const NEEDS = [{
+  id: "time",
+  label: "Time & leave",
+  level: 0
+}, {
+  id: "payroll",
+  label: "Payroll",
+  level: 1
+}, {
+  id: "expense",
+  label: "Expense claims",
+  level: 2
+}, {
+  id: "perf",
+  label: "Performance reviews",
+  level: 2
+}, {
+  id: "goals",
+  label: "Goals & OKR",
+  level: 3
+}, {
+  id: "engage",
+  label: "Engagement",
+  level: 3
+}, {
+  id: "wfp",
+  label: "Workforce planning",
+  level: 4
+}, {
+  id: "ai",
+  label: "AI features",
+  level: 4
+}];
+const ADDONS = [{
+  id: "timesheet",
+  name: "Timesheet",
+  price: 15,
+  desc: "Log hours by project or client.",
+  includedIn: ["proplus", "ent"]
+}, {
+  id: "claim",
+  name: "Claim & Expense",
+  price: 20,
+  desc: "Submit and approve expense claims from mobile.",
+  includedIn: ["pro", "proplus", "ent"]
+}, {
+  id: "emconnect",
+  name: "emconnect",
+  price: 20,
+  desc: "Recruitment and applicant tracking.",
+  includedIn: ["pro", "proplus", "ent"]
+}, {
+  id: "learn",
+  name: "empeo Learn",
+  price: 30,
+  desc: "Online courses and training records (LMS).",
+  includedIn: ["ent"]
+}, {
+  id: "engage",
+  name: "empeo Engage",
+  price: 50,
+  desc: "Pulse surveys and recognition.",
+  includedIn: ["proplus", "ent"]
+}, {
+  id: "perf",
+  name: "Performance Management",
+  price: 60,
+  desc: "Review cycles and 360° feedback.",
+  includedIn: ["pro", "proplus", "ent"]
+}, {
+  id: "goal",
+  name: "Goal Management",
+  price: 60,
+  desc: "Set and track KPIs and OKRs.",
+  includedIn: ["proplus", "ent"]
+}];
+
+// VERIFIED: empeo.com/pricing band table ("effective 15 Oct 2026"), read from the live page on 15 Nov 2026.
+// [band max headcount, monthly price for Lite, Basic, Pro, Pro+, Enterprise]. Yearly = monthly x 10. Over 500 = contact sales.
+const BANDS_RAW = [[10, [390, 690, 1690, 2090, 4690]], [15, [540, 990, 2440, 3090, 6590]], [20, [690, 1290, 3090, 4040, 8340]], [25, [790, 1540, 3790, 4990, 9900]], [30, [940, 1790, 4490, 5940, 11400]], [40, [1190, 2340, 5790, 7890, 14900]], [50, [1390, 2890, 6990, 9790, 17900]], [60, [1590, 3440, 8190, 11690, 20900]], [75, [1890, 4190, 9990, 14490, 24900]], [100, [2490, 5290, 12900, 17900, 29900]], [125, [2990, 6490, 15900, 21900, 34900]], [150, [3490, 7690, 17900, 24900, 39900]], [175, [4090, 8790, 20900, 27900, 44900]], [200, [4590, 9890, 22900, 29900, 49900]], [250, [5690, 12290, 26900, 36900, 59900]], [300, [6790, 14590, 29900, 42900, 69900]], [350, [7890, 16900, 34900, 49900, 79900]], [400, [8890, 19290, 39900, 56900, 89900]], [500, [10900, 23900, 48900, 69900, 109000]]];
+const BANDS = BANDS_RAW.map(([max, prices], i) => ({
+  min: i === 0 ? 1 : BANDS_RAW[i - 1][0] + 1,
+  max,
+  prices
+}));
+const PLAN_IDX = {
+  lite: 0,
+  basic: 1,
+  pro: 2,
+  proplus: 3,
+  ent: 4
+};
+
+// VERIFIED: feature comparison from empeo.com/en/pricing (#cmpData), read 15 Nov 2026.
+// [group, summary per plan, [[feature, [Lite, Basic, Pro, Pro+, Enterprise]], ...]]
+const CMP_RAW = [["People & Data", [true, true, true, true, true], [["Employee Data", [true, true, true, true, true]], ["Organizational Structure", ["20 levels", "20 levels", "20 levels", "20 levels", "Unlimited"]], ["Employee Info Editing History", [true, true, true, true, true]], ["Employee Movement", [true, true, true, true, true]], ["Employee Warning Letter", [true, true, true, true, true]], ["Approval Process and Warning Letter", [false, false, true, true, true]], ["Employee Directory", [true, true, true, true, true]], ["Company Announcements", [true, true, true, true, true]], ["Company Policies", [true, true, true, true, true]], ["Document Checklists", ["3 topics", "5 topics", "5 topics", "10 topics", "Unlimited"]], ["Additional Attachments", [false, "5 files", "5 files", "10 files", "20 files"]], ["Custom Fields", [false, false, false, "20 fields", "Unlimited"]], ["Document Templates", [false, false, false, false, true]], ["Job Offer Letters", [false, false, true, true, true]], ["Employment Contracts", [false, false, "1 template", "3 templates", "Unlimited"]], ["One System for Multi-Company", [true, true, true, true, true]], ["AI Employee Data Import", [false, false, false, false, true]]]], ["Workforce Planning", ["Add-on", "Add-on", "Add-on", "Add-on", true], [["Workforce Overview", ["Add-on", "Add-on", "Add-on", "Add-on", true]], ["Workforce Summary", ["Add-on", "Add-on", "Add-on", "Add-on", true]], ["Job Vacancies", ["Add-on", "Add-on", "Add-on", "Add-on", true]], ["Workforce Adjustment Requests", ["Add-on", "Add-on", "Add-on", "Add-on", true]], ["Workforce Planning Simulation", ["Add-on", "Add-on", "Add-on", "Add-on", true]], ["Workforce Management History", ["Add-on", "Add-on", "Add-on", "Add-on", true]]]], ["Time Attendance Management", [true, true, true, true, true], [["Clock-In", [true, true, true, true, true]], ["Calendar Dashboard", [true, true, true, true, true]], ["Shift Management", [true, true, true, true, true]], ["Data Visualization", [true, true, true, true, true]], ["Shift Swapping", [true, true, true, true, true]], ["Roster Management", [true, true, true, true, true]], ["Shift Templates", [true, true, true, true, true]], ["Double Shift", ["Add-on", "Add-on", "Add-on", "Add-on", true]], ["AI Roster Management", [false, "Pay-per-use\n(AI Tokens)", "Pay-per-use\n(AI Tokens)", "Pay-per-use\n(AI Tokens)", true]]]], ["Leave & Documentation Requests", [true, true, true, true, true], [["Leave Conditions", [true, true, true, true, true]], ["Accumulated Leave", [true, true, true, true, true]], ["Prorated Leave", [false, true, true, true, true]], ["Leave History", ["Unlimited", "Unlimited", "Unlimited", "Unlimited", "Unlimited"]], ["Holiday Calendar", [true, true, true, true, true]], ["Approval Flow Settings", [true, true, true, true, true]], ["Slack, MS Teams, Telegram, Discord Notifications", ["10 accounts", "20 accounts", "50 accounts", "100 accounts", "Unlimited"]], ["Employee Self-Service", [true, true, true, true, true]], ["Manager Self-Service", [true, true, true, true, true]], ["Submit Resignation via System", [false, false, true, true, true]], ["Offboarding Documents", [false, true, true, true, true]]]], ["Advanced Payroll Automation", [false, true, true, true, true], [["Income and Deductions", [false, true, true, true, true]], ["Social Security Contributions", [false, true, true, true, true]], ["Management of Provident Funds", [false, true, true, true, true]], ["Legal Execution & Student Loan Deductions", [false, true, true, true, true]], ["Supports Multiple Pay Schedules", [false, true, true, true, true]], ["Diligence Allowance", [false, true, true, true, true]], ["Employee Liabilities", [false, true, true, true, true]], ["Payroll Calculations", [false, true, true, true, true]], ["Benefits Summary per Pay Period", [false, true, true, true, true]], ["Tax Absorption", [false, false, true, true, true]], ["Payslip", [false, true, true, true, true]], ["Payslip Access Code", [false, true, true, true, true]], ["Payroll Access Permissions for Groups", [false, "Add-on", true, true, true]], ["Special Group Benefits", [false, true, true, true, true]], ["Self-Service Benefits", [false, false, true, true, true]], ["Employee Shuttle Management", [false, false, true, true, true]], ["Employee Joint Investment Program (EJIP)", [false, false, true, true, true]]]], ["Recruitment Platform", [true, true, true, true, true], [["Job Application Page", ["1 site", "1 site", "5 sites", "5 sites", "10 sites"]], ["Job Posting", ["3 positions", "3 positions", "Unlimited", "Unlimited", "Unlimited"]], ["Job Board Integration", [true, true, true, true, true]], ["Apply via LINE OA", [true, true, true, true, true]], ["Application System", [true, true, true, true, true]], ["Application History", ["90 days", "90 days", "Unlimited", "Unlimited", "Unlimited"]], ["Candidate Comparison", [true, true, true, true, true]], ["Kanban View", [true, true, true, true, true]], ["Video Interview", ["Add-on", "Add-on", true, true, true]], ["Candidate Status", [true, true, true, true, true]], ["Candidate Scheduling", [true, true, true, true, true]], ["Advanced Interview Scheduling", [false, false, true, true, true]], ["Self-Booking Interview", [false, false, true, true, true]], ["Notifications", [true, true, true, true, true]], ["Automatic Conversion", [true, true, true, true, true]], ["Preboarding New Employees", [true, true, true, true, true]], ["Job Application Reports", [true, true, true, true, true]], ["JobdeeO", [true, true, true, true, true]], ["Candidate Evaluations", ["Add-on", "Add-on", true, true, true]], ["AI Score & Candidate Ranking", [false, "Pay-per-use\n(AI Tokens)", "Pay-per-use\n(AI Tokens)", "Pay-per-use\n(AI Tokens)", true]], ["Background Check", ["340 Coin\nper check", "340 Coin\nper check", "340 Coin\nper check", "340 Coin\nper check", "340 Coin\nper check"]]]], ["empeo Learn & Training", ["Limited", "Limited", true, true, true], [["Online Learning Courses", ["1 course\n15 min", "1 course\n30 min", "3 courses\n30 min", "3 courses\n30 min", "Unlimited\n30 min\nper user"]], ["Design Diverse Lessons", ["Up to\n20 lessons", "Up to\n20 lessons", "Up to\n20 lessons", "Up to\n20 lessons", "Up to\n100 lessons"]], ["Support for Multiple Content Types", [true, true, true, true, true]], ["Mandatory Courses", [true, true, true, true, true]], ["Quizzes and Tests", ["Add-on", "Add-on", true, true, true]], ["Microlearning", [true, true, true, true, true]], ["Certificates", [true, true, true, true, true]], ["Course Reviews & Ratings", [false, false, true, true, true]], ["Learning History", [true, true, true, true, true]], ["Dashboard and Reports", [true, true, true, true, true]], ["Achievement Awards", [false, false, false, true, true]], ["Training Programs", [false, false, true, true, true]], ["Multi-Session Training Management", [false, false, true, true, true]], ["Training Enrollment & Quotas", [false, false, true, true, true]], ["Recurring Training by Expiry", [false, false, true, true, true]], ["Post-Training Evaluation", [false, false, true, true, true]], ["Employee Training Dashboard", [false, false, true, true, true]], ["Learn+ Skills & Assignments", ["Add-on", "Add-on", "Add-on", true, true]], ["AI Course Builder", [false, false, false, false, true]]]], ["Performance Management System (PMS)", ["Add-on", "Add-on", true, true, true], [["Comprehensive Assessment", ["Add-on", "Add-on", true, true, true]], ["Flexible Evaluation Types", ["Add-on", "Add-on", true, true, true]], ["Questions & Weighting", ["Add-on", "Add-on", true, true, true]], ["Score-Based Grading", ["Add-on", "Add-on", true, true, true]], ["Performance Calibration", ["Add-on", "Add-on", true, true, true]], ["Comprehensive Performance Metrics", ["Add-on", "Add-on", true, true, true]], ["Multi-Dimensional Assessment Tools", ["Add-on*", "Add-on*", "Y*", true, true]], ["Final Grade", ["Add-on*", "Add-on*", "Y*", true, true]], ["Grading Settings in One Place", ["Add-on", "Add-on", true, true, true]], ["Curve-Based Grading", ["Add-on", "Add-on", true, true, true]], ["Skill-Based Competency Assessment", [false, false, false, true, true]], ["AI Feedback Summary", [false, false, false, false, true]]]], ["Goal Management", ["Add-on", "Add-on", "Add-on", true, true], [["Organizational Goal Setting", ["Add-on", "Add-on", "Add-on", true, true]], ["Corporate KPI Management", ["Add-on", "Add-on", "Add-on", true, true]], ["Flexible KPI Cascading", ["Add-on", "Add-on", "Add-on", true, true]], ["Master KPI", ["Add-on", "Add-on", "Add-on", true, true]], ["OKR AI Coach", [false, "Pay-per-use\n(AI Tokens)", "Pay-per-use\n(AI Tokens)", "Pay-per-use\n(AI Tokens)", true]], ["Goal Review Cycles", ["Add-on", "Add-on", "Add-on", true, true]], ["Weighted Scoring", ["Add-on", "Add-on", "Add-on", true, true]], ["Goal Update Frequency", ["Add-on", "Add-on", "Add-on", true, true]], ["Progress Check-Ins", ["Add-on", "Add-on", "Add-on", true, true]], ["Performance Dashboard", ["Add-on", "Add-on", "Add-on", true, true]]]], ["Skill Sets", [false, false, false, true, true], [["Skill Management", [false, false, false, true, true]], ["Skill Framework", [false, false, false, true, true]], ["Skill Development", [false, false, false, true, true]], ["Skill Dashboard", [false, false, false, true, true]], ["Individual Competency Analysis", [false, false, false, true, true]], ["Link Skills to Training & Certificates", [false, false, false, true, true]], ["empeo English Proficiency Test", [false, false, false, true, true]]]], ["Career Path", [false, false, false, false, true], [["Create career paths", [false, false, false, false, true]], ["Set criteria for each position", [false, false, false, false, true]], ["Readiness Score", [false, false, false, false, true]], ["Development plan on the employee profile", [false, false, false, false, true]]]], ["Succession Plan", [false, false, false, false, true], [["Find successors", [false, false, false, false, true]], ["Compare and rank successors", [false, false, false, false, true]], ["Linked to career paths", [false, false, false, false, true]]]], ["Asset Management", [false, false, true, true, true], [["Supports a Wide Range of Asset Types", [false, false, true, true, true]], ["Record Asset Details", [false, false, true, true, true]], ["Assign a Property Custodian", [false, false, true, true, true]], ["Manage the Return of Company Assets", [false, false, true, true, true]], ["Asset Requests", [false, false, true, true, true]], ["Asset Tags & QR Codes", [false, false, true, true, true]], ["Self-Service Asset Handover", [false, false, true, true, true]], ["Scheduled Asset Audits", [false, false, true, true, true]]]], ["Employee Engagement", ["Add-on", "Add-on", "Add-on", true, true], [["Daily Pulse Survey", ["Add-on", "Add-on", "Add-on", true, true]], ["Recognition & Feedback", ["Add-on", "Add-on", "Add-on", true, true]], ["Achievement Card", ["Add-on", "Add-on", "Add-on", true, true]], ["Reward & Tokens", ["Add-on", "Add-on", "Add-on", true, true]], ["Reward Redemption", ["Add-on", "Add-on", "Add-on", true, true]], ["emjoy Dashboard", ["Add-on", "Add-on", "Add-on", true, true]], ["Mission & Task", ["Add-on", "Add-on", "Add-on", true, true]], ["Work Persona Assessments", ["Add-on", "Add-on", "Add-on", true, true]]]], ["Workplace Chat", ["Add-on", "Add-on", "Add-on", "Add-on", "Add-on"], [["Personal Chat", ["Add-on", "Add-on", "Add-on", "Add-on", "Add-on"]], ["Group Chat", ["Add-on", "Add-on", "Add-on", "Add-on", "Add-on"]], ["Dynamic Team Rooms", ["Add-on", "Add-on", "Add-on", "Add-on", "Add-on"]], ["Organization Channels", ["Add-on", "Add-on", "Add-on", "Add-on", "Add-on"]], ["HR Support Chat with empeo AI", ["Add-on", "Add-on", "Add-on", "Add-on", "Add-on"]], ["Chat Tools", ["Add-on", "Add-on", "Add-on", "Add-on", "Add-on"]]]], ["Reports & Dashboards", [true, true, true, true, true], [["Ready-Made Reports", [true, true, true, true, true]], ["Custom Report", [true, true, true, true, true]], ["HR Dashboard", [false, true, true, true, true]], ["Custom Dashboards with Power BI", [false, false, false, false, true]]]], ["empeo AI Coach", ["Add-on", "Add-on", "Add-on", "Add-on", true], [["AI Daily Coach", ["Add-on", "Add-on", "Add-on", "Add-on", true]], ["AI Team Coach", ["Add-on", "Add-on", "Add-on", "Add-on", true]]]], ["Security and Integration", ["Standard", "Standard", "Standard", "Advanced", "Ultimate"], [["Certification", [true, true, true, true, true]], ["PIN Code", [true, true, true, true, true]], ["Data Access Permissions", [true, true, true, true, true]], ["Role Specific Settings", [true, true, true, true, true]], ["Single Sign-On", [true, true, true, true, true]], ["Payroll Access Permissions for Groups", [false, "Add-on", true, true, true]], ["Third-Party Integration", [false, true, true, true, true]], ["Open API", ["Add-on", "Add-on", "Add-on", "Add-on", true]], ["2FA Authentication", [false, false, false, true, true]], ["Azure AD Integration", [false, false, false, true, true]], ["Custom Domain", [false, false, false, true, true]], ["Custom SSO", ["Add-on", "Add-on", "Add-on", "Add-on", true]], ["Mobile Custom Color Theme", [false, false, false, false, true]], ["MCP AI Integration", [false, false, false, false, true]]]], ["Add-on Features", ["Add-on", "Add-on", "Essentials", "Essentials", "All Included"], [["Mobile Application", ["Limited", true, true, true, true]], ["Claims & Expenses", ["Add-on", "Add-on", true, true, true]], ["Performance Management", ["Add-on", "Add-on", true, true, true]], ["Goals Management", ["Add-on", "Add-on", "Add-on", true, true]], ["Timesheet", ["Add-on", "Add-on", "Add-on", true, true]], ["empeo Learn", ["1 course\n15 min", "1 course\n30 min", "3 courses\n30 min", "3 courses\n30 min", "Unlimited\n30 min\nper user"]], ["Employee Engagement", ["Add-on", "Add-on", "Add-on", true, true]], ["Learn+ Skills & Assignments", ["Add-on", "Add-on", "Add-on", true, true]], ["AI Expense", [false, false, false, false, true]], ["AI Credit", ["Add-on for\nWorkplace Chat only", "Add-on", "Add-on", "Add-on", "Add-on"]], ["Activity Management", ["Add-on", "Add-on", "Add-on", "Add-on", true]], ["Workplace Chat", ["Add-on", "Add-on", "Add-on", "Add-on", "Add-on"]], ["IOMO Care (Scanner Protection)", ["Add-on", "Add-on", "Add-on", "Add-on", "Add-on"]]]], ["Post Sales Services", [true, true, true, true, true], [["Customer success", [true, true, true, true, true]], ["Help Center", [true, true, true, true, true]], ["empeo Academy", [true, true, true, true, true]], ["After-Sales Support", [true, true, true, true, true]], ["Online Training Classes", [true, true, true, true, true]], ["empeo Clinic", [true, true, true, true, true]], ["Support Access Mode", [true, true, true, true, true]], ["Phone Support", [false, false, true, true, true]], ["Private Key Account", [false, false, false, false, true]]]]];
+const CMP = CMP_RAW.map(([name, summary, rows]) => ({
+  name,
+  summary,
+  rows: rows.map(([n, v]) => ({
+    name: n,
+    values: v
+  }))
+}));
+const CMP_TOTAL = CMP.reduce((n, g) => n + g.rows.length, 0);
+const findRow = (group, row) => {
+  const g = CMP.find(x => x.name === group);
+  return row ? g.rows.find(r => r.name === row).values : g.summary;
+};
+// Decision-relevant rows for the compact view. Labels are shortened; values come straight from CMP.
+const KEY_ROWS = [["Payroll automation", "Advanced Payroll Automation", "Payroll Calculations"], ["HR dashboard", "Reports & Dashboards", "HR Dashboard"], ["Claims & expenses", "Add-on Features", "Claims & Expenses"], ["Performance management", "Add-on Features", "Performance Management"], ["Goals (KPI & OKR)", "Add-on Features", "Goals Management"], ["Employee engagement", "Add-on Features", "Employee Engagement"], ["Timesheet", "Add-on Features", "Timesheet"], ["Job posting", "Recruitment Platform", "Job Posting"], ["Online courses (empeo Learn)", "empeo Learn & Training", "Online Learning Courses"], ["Workforce planning", "Workforce Planning", null], ["Career path & succession", "Career Path", null], ["2FA, Azure AD, custom domain", "Security and Integration", "2FA Authentication"], ["Open API", "Security and Integration", "Open API"], ["Phone support", "Post Sales Services", "Phone Support"]].map(([label, g, r]) => ({
+  name: label,
+  values: findRow(g, r)
+}));
+const BILLING = {
+  monthly: {
+    label: "Monthly",
+    months: 1,
+    per: "month",
+    save: null
+  },
+  quarterly: {
+    label: "Quarterly",
+    months: 3,
+    per: "quarter",
+    save: "Save 5%"
+  },
+  annual: {
+    label: "Annual",
+    months: 12,
+    per: "year",
+    save: "2 months free"
+  }
+};
+
+/* ------------------------------------------------------------------ PRICING */
+const r2 = n => Math.round(n * 100) / 100;
+const bandFor = n => BANDS.find(b => n >= b.min && n <= b.max) || null;
+const bandAnnual = (plan, band) => band.prices[PLAN_IDX[plan.id]] * 10;
+function planCharge(plan, band, billing) {
+  const monthly = band.prices[PLAN_IDX[plan.id]];
+  const annual = monthly * 10; // FAQ: yearly = monthly x 10
+  const months = BILLING[billing].months;
+  const list = r2(monthly * months);
+  const charge = billing === "monthly" ? monthly : billing === "quarterly" ? r2(monthly * 3 * 0.95) : annual;
+  return {
+    list,
+    charge,
+    discount: r2(list - charge),
+    monthly,
+    annual,
+    months
+  };
+}
+function computeQuote({
+  planId,
+  employees,
+  billing,
+  addons
+}) {
+  const plan = PLANS.find(p => p.id === planId);
+  const band = bandFor(employees);
+  if (!plan || !band) return null;
+  const pc = planCharge(plan, band, billing);
+  const addonLines = ADDONS.filter(a => addons.includes(a.id) && !a.includedIn.includes(planId)).map(a => ({
+    ...a,
+    amount: r2(a.price * employees * pc.months)
+  }));
+  const addonTotal = r2(addonLines.reduce((s, a) => s + a.amount, 0));
+  const subtotal = r2(pc.charge + addonTotal);
+  const vat = r2(subtotal * VAT_RATE);
+  const total = r2(subtotal + vat);
+  const renew = new Date();
+  renew.setMonth(renew.getMonth() + pc.months);
+  return {
+    plan,
+    band,
+    billing,
+    employees,
+    ...pc,
+    addonLines,
+    addonTotal,
+    subtotal,
+    vat,
+    total,
+    renew
+  };
+}
+const thb = (n, dec = 2) => "฿" + n.toLocaleString("en-US", {
+  minimumFractionDigits: dec,
+  maximumFractionDigits: dec
+});
+const thb0 = n => thb(Math.round(n), 0);
+const fmtDate = d => d.toLocaleDateString("en-GB", {
+  day: "numeric",
+  month: "short",
+  year: "numeric"
+});
+
+/* ------------------------------------------------------------------ ICONS */
+const Icon = ({
+  d,
+  size = 16,
+  stroke = 2,
+  fill = "none"
+}) => /*#__PURE__*/React.createElement("svg", {
+  width: size,
+  height: size,
+  viewBox: "0 0 24 24",
+  fill: fill,
+  stroke: "currentColor",
+  strokeWidth: stroke,
+  strokeLinecap: "round",
+  strokeLinejoin: "round",
+  "aria-hidden": "true"
+}, d);
+const I = {
+  check: /*#__PURE__*/React.createElement("path", {
+    d: "M5 12.5l4.5 4.5L19 7.5"
+  }),
+  lock: /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement("rect", {
+    x: "4",
+    y: "10",
+    width: "16",
+    height: "11",
+    rx: "2"
+  }), /*#__PURE__*/React.createElement("path", {
+    d: "M8 10V7a4 4 0 018 0v3"
+  })),
+  card: /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement("rect", {
+    x: "2.5",
+    y: "5",
+    width: "19",
+    height: "14",
+    rx: "2"
+  }), /*#__PURE__*/React.createElement("path", {
+    d: "M2.5 10h19M6.5 15h4"
+  })),
+  bank: /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement("path", {
+    d: "M3 10l9-6 9 6"
+  }), /*#__PURE__*/React.createElement("path", {
+    d: "M5 10v8M9.5 10v8M14.5 10v8M19 10v8M3 20h18"
+  })),
+  upload: /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement("path", {
+    d: "M12 16V4M7 9l5-5 5 5"
+  }), /*#__PURE__*/React.createElement("path", {
+    d: "M4 16v3a1 1 0 001 1h14a1 1 0 001-1v-3"
+  })),
+  alert: /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement("circle", {
+    cx: "12",
+    cy: "12",
+    r: "9.5"
+  }), /*#__PURE__*/React.createElement("path", {
+    d: "M12 7.5v5.5M12 16.5v.01"
+  })),
+  info: /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement("circle", {
+    cx: "12",
+    cy: "12",
+    r: "9.5"
+  }), /*#__PURE__*/React.createElement("path", {
+    d: "M12 11v5.5M12 7.5v.01"
+  })),
+  x: /*#__PURE__*/React.createElement("path", {
+    d: "M6 6l12 12M18 6L6 18"
+  }),
+  clock: /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement("circle", {
+    cx: "12",
+    cy: "12",
+    r: "9.5"
+  }), /*#__PURE__*/React.createElement("path", {
+    d: "M12 7v5l3 2"
+  })),
+  arrow: /*#__PURE__*/React.createElement("path", {
+    d: "M5 12h14M13 6l6 6-6 6"
+  }),
+  back: /*#__PURE__*/React.createElement("path", {
+    d: "M19 12H5M11 6l-6 6 6 6"
+  }),
+  users: /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement("circle", {
+    cx: "9",
+    cy: "8",
+    r: "3.5"
+  }), /*#__PURE__*/React.createElement("path", {
+    d: "M2.5 20a6.5 6.5 0 0113 0"
+  }), /*#__PURE__*/React.createElement("path", {
+    d: "M16 4.5a3.5 3.5 0 010 7M18 14a6.5 6.5 0 013.5 6"
+  })),
+  sliders: /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement("path", {
+    d: "M4 6h10M18 6h2M4 12h4M12 12h8M4 18h12M20 18h0"
+  }), /*#__PURE__*/React.createElement("circle", {
+    cx: "16",
+    cy: "6",
+    r: "2"
+  }), /*#__PURE__*/React.createElement("circle", {
+    cx: "10",
+    cy: "12",
+    r: "2"
+  }), /*#__PURE__*/React.createElement("circle", {
+    cx: "18",
+    cy: "18",
+    r: "2"
+  })),
+  file: /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement("path", {
+    d: "M14 3H6a1 1 0 00-1 1v16a1 1 0 001 1h12a1 1 0 001-1V8z"
+  }), /*#__PURE__*/React.createElement("path", {
+    d: "M14 3v5h5"
+  })),
+  people: /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement("circle", {
+    cx: "8",
+    cy: "7.5",
+    r: "3.6"
+  }), /*#__PURE__*/React.createElement("circle", {
+    cx: "16.5",
+    cy: "8.5",
+    r: "2.9"
+  }), /*#__PURE__*/React.createElement("path", {
+    d: "M1.5 19.5c0-3.9 2.9-6.8 6.5-6.8s6.5 2.9 6.5 6.8z"
+  }), /*#__PURE__*/React.createElement("path", {
+    d: "M15.6 19.5c0-2.3-.7-4.3-2-5.8a5 5 0 019.4 2.6v3.2z"
+  })),
+  pencil: /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement("path", {
+    d: "M4 20h4L19 9a2.8 2.8 0 00-4-4L4 16z"
+  }), /*#__PURE__*/React.createElement("path", {
+    d: "M13.5 6.5l4 4"
+  })),
+  phone: /*#__PURE__*/React.createElement("path", {
+    d: "M5 4h4l2 5-2.5 1.5a11 11 0 005 5L15 13l5 2v4a1 1 0 01-1 1A16 16 0 014 5a1 1 0 011-1z"
+  })
+};
+const Sample = ({
+  children = "Sample"
+}) => /*#__PURE__*/React.createElement("span", {
+  className: "chip sample",
+  title: "Illustrative value, not verified on empeo.com"
+}, children);
+
+/* ------------------------------------------------------------------ SHARED UI */
+const STEPS = ["Plan", "Configure", "Review", "Payment", "Done"];
+function Stepper({
+  step,
+  maxStep,
+  go
+}) {
+  return /*#__PURE__*/React.createElement("nav", {
+    "aria-label": "Checkout progress"
+  }, /*#__PURE__*/React.createElement("ol", {
+    className: "stepper"
+  }, STEPS.map((s, i) => {
+    const done = i < step || i <= maxStep && i !== step && step !== 4;
+    const canGo = i <= maxStep && step !== 4 && i !== step;
+    return /*#__PURE__*/React.createElement("li", {
+      key: s
+    }, /*#__PURE__*/React.createElement("button", {
+      className: done ? "done" : "",
+      "aria-current": i === step ? "step" : undefined,
+      onClick: () => canGo && go(i),
+      disabled: !canGo && i !== step,
+      tabIndex: canGo ? 0 : -1
+    }, /*#__PURE__*/React.createElement("span", {
+      className: "dot"
+    }, done ? /*#__PURE__*/React.createElement(Icon, {
+      d: I.check,
+      size: 12,
+      stroke: 3
+    }) : i + 1), s));
+  })));
+}
+
+// Slider stops mirror empeo.com: labels at 25 · 50 · 75 · 100 · 150 · 200 · 300 · 400 · 500+, linear between stops.
+const PTS = [1, 25, 50, 75, 100, 150, 200, 300, 400, 501];
+const SEG = 100,
+  MAXP = SEG * (PTS.length - 1),
+  THUMB = 30;
+const posOf = v => {
+  v = Math.max(1, Math.min(501, v));
+  for (let i = 0; i < PTS.length - 1; i++) if (v <= PTS[i + 1]) return (i + (v - PTS[i]) / (PTS[i + 1] - PTS[i])) * SEG;
+  return MAXP;
+};
+const valAt = p => {
+  const i = Math.min(PTS.length - 2, Math.max(0, Math.floor(p / SEG)));
+  return Math.round(PTS[i] + (p - i * SEG) / SEG * (PTS[i + 1] - PTS[i]));
+};
+const atPct = pct => `calc(${pct}% + ${((0.5 - pct / 100) * THUMB).toFixed(2)}px)`;
+function HeadcountEntry({
+  value,
+  onChange,
+  id
+}) {
+  const [draft, setDraft] = useState(String(value));
+  const [focused, setFocused] = useState(false);
+  useEffect(() => {
+    if (!focused) setDraft(String(value));
+  }, [value, focused]);
+  const clamp = n => Math.max(1, Math.min(9999, n));
+  const type = raw => {
+    const d = raw.replace(/\D/g, "").slice(0, 4);
+    setDraft(d);
+    const n = parseInt(d, 10);
+    if (n > 0) onChange(clamp(n)); // live update while typing
+  };
+  return /*#__PURE__*/React.createElement("div", {
+    className: "hc-entry"
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "stepper-input" + (focused ? " focused" : "")
+  }, /*#__PURE__*/React.createElement("button", {
+    type: "button",
+    "aria-label": "One fewer employee",
+    onClick: () => onChange(clamp(value - 1)),
+    disabled: value <= 1
+  }, "\u2212"), /*#__PURE__*/React.createElement("input", {
+    id: id,
+    type: "text",
+    inputMode: "numeric",
+    pattern: "[0-9]*",
+    value: draft,
+    "aria-describedby": id + "-hint " + id + "-note",
+    onFocus: e => {
+      setFocused(true);
+      e.target.select();
+    },
+    onBlur: () => {
+      setFocused(false);
+      if (!(parseInt(draft, 10) > 0)) setDraft(String(value));
+    },
+    onChange: e => type(e.target.value),
+    onKeyDown: e => {
+      if (e.key === "Enter") e.target.blur();
+      if (e.key === "ArrowUp") {
+        e.preventDefault();
+        onChange(clamp(value + 1));
+      }
+      if (e.key === "ArrowDown") {
+        e.preventDefault();
+        onChange(clamp(value - 1));
+      }
+    }
+  }), /*#__PURE__*/React.createElement("button", {
+    type: "button",
+    "aria-label": "One more employee",
+    onClick: () => onChange(clamp(value + 1))
+  }, "+")), /*#__PURE__*/React.createElement("span", {
+    className: "hc-entry-unit"
+  }, "people"), /*#__PURE__*/React.createElement("span", {
+    className: "hc-hint",
+    id: id + "-hint"
+  }, /*#__PURE__*/React.createElement(Icon, {
+    d: I.pencil,
+    size: 13
+  }), " Type a number, use \u2212 +, or drag the slider"));
+}
+function HeadcountSlider({
+  value,
+  onChange,
+  id
+}) {
+  const [editing, setEditing] = useState(false);
+  const [draft, setDraft] = useState("");
+  const pct = posOf(value) / MAXP * 100;
+  const label = value > 500 ? "500+" : String(value);
+  const commit = () => {
+    const n = parseInt(draft.replace(/\D/g, ""), 10);
+    if (Number.isFinite(n) && n > 0) onChange(Math.min(9999, n));
+    setEditing(false);
+  };
+  return /*#__PURE__*/React.createElement("div", {
+    className: "hc-wrap"
+  }, /*#__PURE__*/React.createElement(HeadcountEntry, {
+    id: id,
+    value: value,
+    onChange: onChange
+  }), /*#__PURE__*/React.createElement("div", {
+    className: "hc-slider"
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "hc-rail"
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "hc-tip" + (editing ? " editing" : ""),
+    style: {
+      left: atPct(pct),
+      "--shift": (pct > 86 ? Math.min(38, (pct - 86) * 2.7) : pct < 6 ? -Math.min(38, (6 - pct) * 6.3) : 0) + "%"
+    }
+  }, editing ? /*#__PURE__*/React.createElement("input", {
+    autoFocus: true,
+    "aria-label": "Type number of employees",
+    inputMode: "numeric",
+    value: draft,
+    onChange: e => setDraft(e.target.value.replace(/\D/g, "").slice(0, 4)),
+    onBlur: commit,
+    onKeyDown: e => {
+      if (e.key === "Enter") commit();
+      if (e.key === "Escape") setEditing(false);
+    }
+  }) : /*#__PURE__*/React.createElement("button", {
+    type: "button",
+    onClick: () => {
+      setDraft(value > 500 ? "" : String(value));
+      setEditing(true);
+    },
+    "aria-label": `${label} employees. Click to type a number`
+  }, /*#__PURE__*/React.createElement("span", {
+    className: "hc-num"
+  }, label), /*#__PURE__*/React.createElement(Icon, {
+    d: I.pencil,
+    size: 12
+  })), /*#__PURE__*/React.createElement("span", {
+    className: "hc-unit"
+  }, "people")), /*#__PURE__*/React.createElement("input", {
+    id: id + "-range",
+    className: "hc-range",
+    type: "range",
+    min: "0",
+    max: MAXP,
+    step: "1",
+    value: posOf(value),
+    style: {
+      "--p": pct + "%"
+    },
+    "aria-label": "Number of employees",
+    "aria-valuetext": `${label} employees`,
+    "aria-describedby": id + "-note",
+    onChange: e => onChange(valAt(+e.target.value))
+  })), /*#__PURE__*/React.createElement("div", {
+    className: "hc-ticks",
+    "aria-hidden": "true"
+  }, PTS.slice(1).map((v, i) => {
+    const tp = (i + 1) / (PTS.length - 1) * 100;
+    return /*#__PURE__*/React.createElement("button", {
+      type: "button",
+      tabIndex: -1,
+      key: v,
+      style: {
+        left: atPct(tp)
+      },
+      className: posOf(value) >= (i + 1) * SEG ? "on" : "",
+      onClick: () => onChange(v)
+    }, v > 500 ? "500+" : v);
+  }))));
+}
+function BandNote({
+  employees,
+  id
+}) {
+  const band = bandFor(employees);
+  if (!band) return /*#__PURE__*/React.createElement("span", {
+    id: id,
+    className: "band-note"
+  }, "Over 500 employees gets a custom quote from Sales.");
+  return /*#__PURE__*/React.createElement("span", {
+    id: id,
+    className: "band-note"
+  }, "Price band ", band.min, "\u2013", band.max, " employees \xB7 ", band.max > employees ? `${band.max - employees} more at no extra cost` : "top of this band");
+}
+function Summary({
+  q,
+  step,
+  onContinue,
+  continueLabel,
+  continueDisabled,
+  onEdit
+}) {
+  if (!q) return null;
+  const b = BILLING[q.billing];
+  return /*#__PURE__*/React.createElement("aside", {
+    className: "summary",
+    "aria-label": "Order summary"
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "s-head"
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "muted small"
+  }, "Order summary"), /*#__PURE__*/React.createElement("div", {
+    className: "s-plan"
+  }, /*#__PURE__*/React.createElement("b", null, "empeo ", q.plan.name), step < 3 && step > 0 && onEdit && /*#__PURE__*/React.createElement("button", {
+    className: "link small",
+    onClick: onEdit
+  }, "Change plan")), /*#__PURE__*/React.createElement("div", {
+    className: "s-meta"
+  }, q.employees, " employees \xB7 ", b.label, " billing")), /*#__PURE__*/React.createElement("ul", {
+    className: "lines",
+    "aria-live": "polite"
+  }, /*#__PURE__*/React.createElement("li", null, /*#__PURE__*/React.createElement("span", null, q.plan.name, " plan", /*#__PURE__*/React.createElement("span", {
+    className: "l-sub"
+  }, thb(q.monthly), "/month \xD7 ", q.months, " ", q.months === 1 ? "month" : "months", " \xB7 band ", q.band.min, "\u2013", q.band.max)), /*#__PURE__*/React.createElement("span", {
+    className: "amt"
+  }, thb(q.list))), q.discount > 0 && /*#__PURE__*/React.createElement("li", {
+    className: "disc"
+  }, /*#__PURE__*/React.createElement("span", null, b.label, " discount", /*#__PURE__*/React.createElement("span", {
+    className: "l-sub"
+  }, q.billing === "annual" ? "Pay for 10 months, use 12" : "5% off the plan price")), /*#__PURE__*/React.createElement("span", {
+    className: "amt"
+  }, "\u2212", thb(q.discount))), q.addonLines.map(a => /*#__PURE__*/React.createElement("li", {
+    key: a.id
+  }, /*#__PURE__*/React.createElement("span", null, a.name, /*#__PURE__*/React.createElement("span", {
+    className: "l-sub"
+  }, q.employees, " users \xD7 \u0E3F", a.price, " \xD7 ", q.months, " mo")), /*#__PURE__*/React.createElement("span", {
+    className: "amt"
+  }, thb(a.amount)))), /*#__PURE__*/React.createElement("li", {
+    className: "sub"
+  }, /*#__PURE__*/React.createElement("span", null, "Subtotal"), /*#__PURE__*/React.createElement("span", {
+    className: "amt"
+  }, thb(q.subtotal))), /*#__PURE__*/React.createElement("li", null, /*#__PURE__*/React.createElement("span", null, "VAT 7%"), /*#__PURE__*/React.createElement("span", {
+    className: "amt"
+  }, thb(q.vat)))), /*#__PURE__*/React.createElement("div", {
+    className: "due"
+  }, /*#__PURE__*/React.createElement("span", {
+    className: "due-label"
+  }, "Amount due now", /*#__PURE__*/React.createElement("small", null, "for ", b.months === 1 ? "1 month" : b.months === 3 ? "3 months" : "12 months", ", VAT included")), /*#__PURE__*/React.createElement("span", {
+    className: "due-amt"
+  }, thb(q.total))), /*#__PURE__*/React.createElement("div", {
+    className: "s-notes"
+  }, /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement(Icon, {
+    d: I.clock,
+    size: 14
+  }), " Renews ", fmtDate(q.renew), " at the same price. Cancel before then to stop renewal."), /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement(Icon, {
+    d: I.users,
+    size: 14
+  }), " Implementation: ", q.employees <= 100 ? "free for up to 100 employees" : "one-time fee quoted separately, not charged today", "."), /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement(Icon, {
+    d: I.info,
+    size: 14
+  }), " Add up to ", q.band.max, " employees without a price change.")), onContinue && /*#__PURE__*/React.createElement("div", {
+    className: "s-cta"
+  }, /*#__PURE__*/React.createElement("button", {
+    className: "btn primary lg block",
+    onClick: onContinue,
+    disabled: continueDisabled
+  }, continueLabel, " ", /*#__PURE__*/React.createElement(Icon, {
+    d: I.arrow
+  }))));
+}
+
+/* ------------------------------------------------------------------ STEP 1: PLAN */
+function useMedia(query) {
+  const get = () => window.matchMedia ? window.matchMedia(query).matches : false;
+  const [m, setM] = useState(get);
+  useEffect(() => {
+    if (!window.matchMedia) return;
+    const mq = window.matchMedia(query);
+    const f = () => setM(mq.matches);
+    mq.addEventListener ? mq.addEventListener("change", f) : mq.addListener(f);
+    return () => mq.removeEventListener ? mq.removeEventListener("change", f) : mq.removeListener(f);
+  }, [query]);
+  return m;
+}
+const PERIOD_WORD = {
+  monthly: "monthly",
+  quarterly: "every 3 months",
+  annual: "annually"
+};
+const money = n => thb(n, Number.isInteger(n) ? 0 : 2);
+function Cell({
+  v,
+  up
+}) {
+  if (up && (v === true || v === "Y*")) return /*#__PURE__*/React.createElement("span", {
+    className: "cv yes up"
+  }, /*#__PURE__*/React.createElement("span", {
+    className: "tick"
+  }, /*#__PURE__*/React.createElement(Icon, {
+    d: I.check,
+    size: 14,
+    stroke: 3.2
+  })), /*#__PURE__*/React.createElement("span", {
+    className: "new-lbl"
+  }, "New", v === "Y*" ? "*" : ""), /*#__PURE__*/React.createElement("span", {
+    className: "sr-only"
+  }, "Newly included"));
+  if (up && v !== false) return /*#__PURE__*/React.createElement("span", {
+    className: "cv up " + (String(v).startsWith("Add-on") ? "add" : "txt")
+  }, String(v).split("\n").map((l, i) => /*#__PURE__*/React.createElement(React.Fragment, {
+    key: i
+  }, i > 0 && /*#__PURE__*/React.createElement("br", null), l)));
+  if (v === true) return /*#__PURE__*/React.createElement("span", {
+    className: "cv yes",
+    title: "Included"
+  }, /*#__PURE__*/React.createElement(Icon, {
+    d: I.check,
+    size: 16,
+    stroke: 2.6
+  }), /*#__PURE__*/React.createElement("span", {
+    className: "sr-only"
+  }, "Included"));
+  if (v === false) return /*#__PURE__*/React.createElement("span", {
+    className: "cv no",
+    title: "Not included",
+    "aria-label": "Not included"
+  }, "\u2013");
+  if (v === "Add-on" || v === "Add-on*") return /*#__PURE__*/React.createElement("span", {
+    className: "cv add"
+  }, v);
+  if (v === "Y*") return /*#__PURE__*/React.createElement("span", {
+    className: "cv yes",
+    title: "Included, conditions apply"
+  }, /*#__PURE__*/React.createElement(Icon, {
+    d: I.check,
+    size: 16,
+    stroke: 2.6
+  }), "*", /*#__PURE__*/React.createElement("span", {
+    className: "sr-only"
+  }, "Included, conditions apply"));
+  return /*#__PURE__*/React.createElement("span", {
+    className: "cv txt"
+  }, String(v).split("\n").map((l, i) => /*#__PURE__*/React.createElement(React.Fragment, {
+    key: i
+  }, i > 0 && /*#__PURE__*/React.createElement("br", null), l)));
+}
+function Compare({
+  s,
+  band,
+  recIdx,
+  choosePlan,
+  openSales,
+  v2,
+  onClose
+}) {
+  const mobile = useMedia("(max-width: 720px)");
+  const [pair, setPair] = useState(() => recIdx != null ? recIdx === 0 ? [0, 1] : [recIdx - 1, recIdx] : [2, 3]);
+  const [showAll, setShowAll] = useState(false);
+  const [diffOnly, setDiffOnly] = useState(false);
+  const [open, setOpen] = useState({});
+  const cols = mobile ? pair : [0, 1, 2, 3, 4];
+  const differs = vals => cols.some(c => JSON.stringify(vals[c]) !== JSON.stringify(vals[cols[0]]));
+  const keyRows = KEY_ROWS.filter(r => !diffOnly || differs(r.values));
+  const groups = CMP.map(g => ({
+    ...g,
+    shown: g.rows.filter(r => !diffOnly || differs(r.values))
+  })).filter(g => g.shown.length);
+  const allOpen = groups.every(g => open[g.name]);
+  const b = BILLING[s.billing];
+  const salesOnly = i => !band || v2 && i === 4;
+  const setPairAt = (k, v) => setPair(p => {
+    const n = [...p];
+    n[k] = +v;
+    if (n[0] === n[1]) n[1 - k] = p[k];
+    return n;
+  });
+  const colCls = c => (c === recIdx ? "rec" : "") + (PLANS[c].popular ? " pop" : "");
+  const isUp = (vals, c, k) => diffOnly && k > 0 && JSON.stringify(vals[c]) !== JSON.stringify(vals[cols[k - 1]]);
+  const cellCls = (vals, c, k) => colCls(c) + (diffOnly ? isUp(vals, c, k) ? " up" : k > 0 ? " same" : " base" : "");
+  const shownRows = () => showAll ? groups.flatMap(g => g.shown) : keyRows;
+  const upCount = (c, k) => shownRows().filter(r => isUp(r.values, c, k)).length;
+  const shownCount = showAll ? groups.reduce((n, g) => n + g.shown.length, 0) : keyRows.length;
+  const hiddenCount = (showAll ? CMP_TOTAL : KEY_ROWS.length) - shownCount;
+  const toggleDiff = on => {
+    setDiffOnly(on);
+    if (on && showAll) setOpen(Object.fromEntries(CMP.map(g => [g.name, true])));
+  };
+  return /*#__PURE__*/React.createElement("section", {
+    className: "compare",
+    id: "compare",
+    "aria-labelledby": "cmp-h"
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "cmp-toolbar"
+  }, /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("h2", {
+    id: "cmp-h"
+  }, "Compare plans"), /*#__PURE__*/React.createElement("p", {
+    className: "muted small"
+  }, showAll ? `All ${CMP_TOTAL} features, grouped by module.` : "The features that usually decide between plans.", " Prices for ", band ? `${band.min}–${band.max} employees` : "500+ employees", ", billed ", PERIOD_WORD[s.billing], ".")), /*#__PURE__*/React.createElement("div", {
+    className: "cmp-controls"
+  }, /*#__PURE__*/React.createElement("label", {
+    className: "toggle"
+  }, /*#__PURE__*/React.createElement("input", {
+    type: "checkbox",
+    checked: diffOnly,
+    onChange: e => toggleDiff(e.target.checked)
+  }), /*#__PURE__*/React.createElement("span", {
+    className: "sw"
+  }), /*#__PURE__*/React.createElement("span", {
+    className: "small"
+  }, "Only show differences")), /*#__PURE__*/React.createElement("button", {
+    className: "icon-btn",
+    "aria-label": "Close comparison",
+    onClick: onClose
+  }, /*#__PURE__*/React.createElement(Icon, {
+    d: I.x,
+    size: 16
+  })))), diffOnly && /*#__PURE__*/React.createElement("div", {
+    className: "diff-note",
+    role: "status"
+  }, /*#__PURE__*/React.createElement("span", {
+    className: "diff-swatch",
+    "aria-hidden": "true"
+  }), /*#__PURE__*/React.createElement("span", null, hiddenCount > 0 ? /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement("b", null, "Hiding ", hiddenCount, " ", hiddenCount === 1 ? "feature" : "features"), " that ", hiddenCount === 1 ? "is" : "are", " the same in ", cols.length === 2 ? "both plans" : "every plan", ". ") : /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement("b", null, "Every ", showAll ? "" : "key ", "feature here differs"), " between the plans shown, so nothing is hidden. "), "Orange cells are what each plan adds over the plan on its left. Everything else is faded.", !showAll && hiddenCount === 0 && /*#__PURE__*/React.createElement(React.Fragment, null, " ", /*#__PURE__*/React.createElement("button", {
+    className: "link",
+    onClick: () => {
+      setShowAll(true);
+      setOpen(Object.fromEntries(CMP.map(g => [g.name, true])));
+    }
+  }, "Apply to all ", CMP_TOTAL, " features")))), mobile && /*#__PURE__*/React.createElement("div", {
+    className: "cmp-pick"
+  }, /*#__PURE__*/React.createElement("label", {
+    className: "sr-only",
+    htmlFor: "pick-a"
+  }, "First plan"), /*#__PURE__*/React.createElement("select", {
+    id: "pick-a",
+    value: pair[0],
+    onChange: e => setPairAt(0, e.target.value)
+  }, PLANS.map((p, i) => /*#__PURE__*/React.createElement("option", {
+    key: p.id,
+    value: i
+  }, p.name))), /*#__PURE__*/React.createElement("span", {
+    className: "muted small"
+  }, "vs"), /*#__PURE__*/React.createElement("label", {
+    className: "sr-only",
+    htmlFor: "pick-b"
+  }, "Second plan"), /*#__PURE__*/React.createElement("select", {
+    id: "pick-b",
+    value: pair[1],
+    onChange: e => setPairAt(1, e.target.value)
+  }, PLANS.map((p, i) => /*#__PURE__*/React.createElement("option", {
+    key: p.id,
+    value: i
+  }, p.name)))), /*#__PURE__*/React.createElement("table", {
+    className: "cmp-table"
+  }, /*#__PURE__*/React.createElement("colgroup", null, /*#__PURE__*/React.createElement("col", {
+    className: "c-feat"
+  }), cols.map(c => /*#__PURE__*/React.createElement("col", {
+    key: c
+  }))), /*#__PURE__*/React.createElement("thead", null, /*#__PURE__*/React.createElement("tr", null, /*#__PURE__*/React.createElement("th", {
+    scope: "col",
+    className: "c-feat"
+  }, /*#__PURE__*/React.createElement("span", {
+    className: "sr-only"
+  }, "Feature")), cols.map((c, k) => {
+    const pc = salesOnly(c) ? null : planCharge(PLANS[c], band, s.billing);
+    return /*#__PURE__*/React.createElement("th", {
+      scope: "col",
+      key: c,
+      className: colCls(c)
+    }, /*#__PURE__*/React.createElement("span", {
+      className: "cmp-name"
+    }, PLANS[c].name), c === recIdx && /*#__PURE__*/React.createElement("span", {
+      className: "chip rec"
+    }, "For you"), /*#__PURE__*/React.createElement("span", {
+      className: "cmp-price"
+    }, pc ? /*#__PURE__*/React.createElement(React.Fragment, null, money(pc.charge), /*#__PURE__*/React.createElement("small", null, "/", b.per)) : "Custom pricing"), diffOnly && (k === 0 ? /*#__PURE__*/React.createElement("span", {
+      className: "up-count base"
+    }, "Starting point") : /*#__PURE__*/React.createElement("span", {
+      className: "up-count"
+    }, "+", upCount(c, k), " vs ", PLANS[cols[k - 1]].name)));
+  }))), !showAll && /*#__PURE__*/React.createElement("tbody", null, keyRows.map(r => /*#__PURE__*/React.createElement("tr", {
+    key: r.name
+  }, /*#__PURE__*/React.createElement("th", {
+    scope: "row"
+  }, r.name), cols.map((c, k) => /*#__PURE__*/React.createElement("td", {
+    key: c,
+    className: cellCls(r.values, c, k)
+  }, /*#__PURE__*/React.createElement(Cell, {
+    v: r.values[c],
+    up: isUp(r.values, c, k)
+  }))))), !keyRows.length && /*#__PURE__*/React.createElement("tr", null, /*#__PURE__*/React.createElement("td", {
+    colSpan: cols.length + 1,
+    className: "muted small cmp-empty"
+  }, "These plans match on every key feature."))), showAll && groups.map(g => /*#__PURE__*/React.createElement("tbody", {
+    key: g.name,
+    className: "grp-body"
+  }, /*#__PURE__*/React.createElement("tr", {
+    className: "grp"
+  }, /*#__PURE__*/React.createElement("th", {
+    scope: "rowgroup"
+  }, /*#__PURE__*/React.createElement("button", {
+    "aria-expanded": !!open[g.name],
+    onClick: () => setOpen(o => ({
+      ...o,
+      [g.name]: !o[g.name]
+    }))
+  }, /*#__PURE__*/React.createElement("svg", {
+    className: "chev",
+    width: "14",
+    height: "14",
+    viewBox: "0 0 24 24",
+    fill: "none",
+    stroke: "currentColor",
+    strokeWidth: "2.5",
+    "aria-hidden": "true"
+  }, /*#__PURE__*/React.createElement("path", {
+    d: "M9 6l6 6-6 6"
+  })), g.name, " ", /*#__PURE__*/React.createElement("span", {
+    className: "muted"
+  }, "(", g.shown.length, ")"))), cols.map((c, k) => /*#__PURE__*/React.createElement("td", {
+    key: c,
+    className: cellCls(g.summary, c, k)
+  }, /*#__PURE__*/React.createElement(Cell, {
+    v: g.summary[c],
+    up: isUp(g.summary, c, k)
+  })))), open[g.name] && g.shown.map(r => /*#__PURE__*/React.createElement("tr", {
+    key: r.name,
+    className: "sub"
+  }, /*#__PURE__*/React.createElement("th", {
+    scope: "row"
+  }, r.name), cols.map((c, k) => /*#__PURE__*/React.createElement("td", {
+    key: c,
+    className: cellCls(r.values, c, k)
+  }, /*#__PURE__*/React.createElement(Cell, {
+    v: r.values[c],
+    up: isUp(r.values, c, k)
+  }))))))), /*#__PURE__*/React.createElement("tfoot", null, /*#__PURE__*/React.createElement("tr", null, /*#__PURE__*/React.createElement("th", null), cols.map(c => /*#__PURE__*/React.createElement("td", {
+    key: c,
+    className: colCls(c)
+  }, salesOnly(c) ? /*#__PURE__*/React.createElement("button", {
+    className: "btn secondary block",
+    onClick: () => openSales(PLANS[c].id)
+  }, "Talk to Sales") : /*#__PURE__*/React.createElement("button", {
+    className: "btn block " + (c === recIdx || recIdx == null && PLANS[c].popular ? "primary" : "secondary"),
+    onClick: () => choosePlan(PLANS[c].id)
+  }, "Choose ", mobile ? "" : PLANS[c].name)))))), /*#__PURE__*/React.createElement("div", {
+    className: "cmp-more"
+  }, /*#__PURE__*/React.createElement("button", {
+    className: "btn secondary",
+    onClick: () => setShowAll(!showAll),
+    "aria-expanded": showAll
+  }, showAll ? "Back to key differences" : `See all ${CMP_TOTAL} features`), showAll && /*#__PURE__*/React.createElement("button", {
+    className: "link small",
+    onClick: () => setOpen(allOpen ? {} : Object.fromEntries(groups.map(g => [g.name, true])))
+  }, allOpen ? "Collapse all groups" : "Expand all groups")), /*#__PURE__*/React.createElement("p", {
+    className: "cmp-legend small muted"
+  }, /*#__PURE__*/React.createElement("span", null, /*#__PURE__*/React.createElement(Cell, {
+    v: true
+  }), " Included"), /*#__PURE__*/React.createElement("span", null, /*#__PURE__*/React.createElement(Cell, {
+    v: "Add-on"
+  }), " Paid add-on"), /*#__PURE__*/React.createElement("span", null, /*#__PURE__*/React.createElement(Cell, {
+    v: false
+  }), " Not available"), /*#__PURE__*/React.createElement("span", null, "Feature list from empeo.com/pricing (", VERIFIED_DATE, "). * Conditions apply, see empeo.com.")));
+}
+function PlanStep({
+  s,
+  set,
+  choosePlan,
+  openSales,
+  v2
+}) {
+  const band = bandFor(s.employees);
+  const b = BILLING[s.billing];
+  const [compareOpen, setCompareOpen] = useState(false);
+  const cmpRef = useRef(null);
+  const picked = NEEDS.filter(n => s.needs.includes(n.id));
+  const recIdx = picked.length ? Math.max(...picked.map(n => n.level)) : null;
+  const rec = recIdx != null ? PLANS[recIdx] : null;
+  const toggleNeed = id => set(p => ({
+    needs: p.needs.includes(id) ? p.needs.filter(x => x !== id) : [...p.needs, id]
+  }));
+  const openCompare = () => {
+    setCompareOpen(true);
+    setTimeout(() => cmpRef.current && cmpRef.current.scrollIntoView({
+      behavior: "smooth",
+      block: "start"
+    }), 40);
+  };
+  const goCard = id => {
+    const el = document.getElementById("plan-" + id);
+    if (el) {
+      el.scrollIntoView({
+        behavior: "smooth",
+        block: "center",
+        inline: "center"
+      });
+      el.classList.add("flash");
+      setTimeout(() => el.classList.remove("flash"), 1200);
+    }
+  };
+  return /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement("div", {
+    className: "page-head"
+  }, /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("h1", null, "Choose your empeo plan"), /*#__PURE__*/React.createElement("p", null, "Every plan builds on the one before it. Set your team size to see your price, then pick a plan or compare them side by side.")), /*#__PURE__*/React.createElement("div", {
+    className: "seg",
+    role: "radiogroup",
+    "aria-label": "Billing period"
+  }, Object.entries(BILLING).map(([k, v]) => /*#__PURE__*/React.createElement("button", {
+    key: k,
+    role: "radio",
+    "aria-checked": s.billing === k,
+    onClick: () => set({
+      billing: k
+    })
+  }, v.label, v.save && /*#__PURE__*/React.createElement("span", {
+    className: "save"
+  }, v.save))))), /*#__PURE__*/React.createElement("section", {
+    className: "finder",
+    "aria-label": "Team size and recommendation"
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "finder-hc"
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "finder-hc-head"
+  }, /*#__PURE__*/React.createElement("label", {
+    className: "finder-label",
+    htmlFor: "hc1"
+  }, "How many employees?"), /*#__PURE__*/React.createElement(BandNote, {
+    employees: s.employees,
+    id: "hc1-note"
+  })), /*#__PURE__*/React.createElement(HeadcountSlider, {
+    id: "hc1",
+    value: s.employees,
+    onChange: v => set({
+      employees: v
+    })
+  })), s.helper ? /*#__PURE__*/React.createElement("div", {
+    className: "helper"
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "helper-head"
+  }, /*#__PURE__*/React.createElement("span", {
+    className: "finder-label",
+    id: "need-label"
+  }, "Not sure which plan? Tick what you need ", /*#__PURE__*/React.createElement("span", {
+    className: "muted"
+  }, "(optional)")), /*#__PURE__*/React.createElement("button", {
+    className: "link small",
+    onClick: () => set({
+      helper: false,
+      needs: []
+    })
+  }, "Skip")), /*#__PURE__*/React.createElement("div", {
+    className: "need-opts",
+    role: "group",
+    "aria-labelledby": "need-label"
+  }, NEEDS.map(n => /*#__PURE__*/React.createElement("button", {
+    key: n.id,
+    className: "need",
+    "aria-pressed": s.needs.includes(n.id),
+    onClick: () => toggleNeed(n.id)
+  }, s.needs.includes(n.id) && /*#__PURE__*/React.createElement(Icon, {
+    d: I.check,
+    size: 13,
+    stroke: 3
+  }), n.label))), /*#__PURE__*/React.createElement("div", {
+    className: "rec-result",
+    "aria-live": "polite"
+  }, rec ? /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement("span", {
+    className: "rec-dot"
+  }, /*#__PURE__*/React.createElement(Icon, {
+    d: I.check,
+    size: 14,
+    stroke: 3
+  })), /*#__PURE__*/React.createElement("span", null, /*#__PURE__*/React.createElement("b", null, rec.name), " is the smallest plan that includes ", picked.map(n => n.label).join(", ").replace(/, ([^,]*)$/, " and $1"), ".", recIdx > 0 && /*#__PURE__*/React.createElement("span", {
+    className: "muted"
+  }, " Some of these are also sold as add-ons for smaller plans.")), /*#__PURE__*/React.createElement("span", {
+    className: "rec-actions"
+  }, /*#__PURE__*/React.createElement("button", {
+    className: "link small",
+    onClick: () => goCard(rec.id)
+  }, "See ", rec.name), /*#__PURE__*/React.createElement("button", {
+    className: "link small",
+    onClick: () => set({
+      needs: []
+    })
+  }, "Clear"))) : /*#__PURE__*/React.createElement("span", {
+    className: "muted small"
+  }, "Pick one or more and we'll highlight the plan that covers them."))) : /*#__PURE__*/React.createElement("div", {
+    className: "helper-collapsed"
+  }, /*#__PURE__*/React.createElement("button", {
+    className: "link small",
+    onClick: () => set({
+      helper: true
+    })
+  }, "Not sure which plan? Get a quick recommendation"))), /*#__PURE__*/React.createElement("div", {
+    className: "plans",
+    role: "list"
+  }, PLANS.map((p, i) => {
+    const isRec = recIdx === i;
+    const salesOnly = !band || v2 && p.id === "ent";
+    const pc = band ? planCharge(p, band, s.billing) : null;
+    return /*#__PURE__*/React.createElement("article", {
+      key: p.id,
+      id: "plan-" + p.id,
+      role: "listitem",
+      className: "plan" + (p.popular ? " popular" : "") + (isRec ? " recommended" : ""),
+      "aria-label": `${p.name} plan`
+    }, /*#__PURE__*/React.createElement("div", {
+      className: "flags"
+    }, isRec && /*#__PURE__*/React.createElement("span", {
+      className: "chip rec rec-ribbon"
+    }, "Recommended for you"), p.badge && /*#__PURE__*/React.createElement("span", {
+      className: "chip " + (p.popular ? "pop" : "suite")
+    }, p.badge)), /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("h3", {
+      className: "plan-name"
+    }, p.name), /*#__PURE__*/React.createElement("p", {
+      className: "best"
+    }, /*#__PURE__*/React.createElement("span", {
+      className: "best-label"
+    }, "Best for"), p.bestFor)), /*#__PURE__*/React.createElement("div", {
+      className: "price-block"
+    }, salesOnly ? /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement("div", {
+      className: "custom-price"
+    }, "Custom pricing"), /*#__PURE__*/React.createElement("p", {
+      className: "billed"
+    }, !band ? "For organizations with more than 500 employees." : "Sales prepares a quote for your headcount and rollout.")) : /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement("div", {
+      className: "price"
+    }, /*#__PURE__*/React.createElement("strong", null, money(pc.charge)), /*#__PURE__*/React.createElement("span", null, "/", b.per)), /*#__PURE__*/React.createElement("p", {
+      className: "billed num"
+    }, "Billed ", PERIOD_WORD[s.billing], " \xB7 ", band.min, "\u2013", band.max, " employees", /*#__PURE__*/React.createElement("br", null), s.billing === "monthly" ? /*#__PURE__*/React.createElement("span", null, "Annual billing gives 2 months free") : /*#__PURE__*/React.createElement(React.Fragment, null, "\u2248 ", thb0(pc.charge / pc.months), "/month", /*#__PURE__*/React.createElement("br", null), /*#__PURE__*/React.createElement("span", {
+      className: "save"
+    }, "Save ", thb0(pc.discount)))))), /*#__PURE__*/React.createElement("div", {
+      className: "cta"
+    }, salesOnly ? /*#__PURE__*/React.createElement("button", {
+      className: "btn block " + (isRec ? "primary" : "secondary"),
+      onClick: () => openSales(p.id)
+    }, "Talk to Sales") : /*#__PURE__*/React.createElement("button", {
+      className: "btn block " + (isRec || recIdx == null && p.popular ? "primary" : "secondary"),
+      onClick: () => choosePlan(p.id)
+    }, "Choose ", p.name)), /*#__PURE__*/React.createElement("div", {
+      className: "benefits"
+    }, /*#__PURE__*/React.createElement("div", {
+      className: "prefix"
+    }, p.prefix), /*#__PURE__*/React.createElement("ul", null, p.highlights.map(h => /*#__PURE__*/React.createElement("li", {
+      key: h
+    }, /*#__PURE__*/React.createElement(Icon, {
+      d: I.check,
+      size: 14,
+      stroke: 2.6
+    }), h)))));
+  })), /*#__PURE__*/React.createElement("div", {
+    className: "compare-bar"
+  }, /*#__PURE__*/React.createElement("button", {
+    className: "btn " + (compareOpen ? "ghost" : "secondary"),
+    onClick: () => compareOpen ? setCompareOpen(false) : openCompare(),
+    "aria-expanded": compareOpen,
+    "aria-controls": "compare"
+  }, /*#__PURE__*/React.createElement(Icon, {
+    d: I.sliders,
+    size: 16
+  }), " ", compareOpen ? "Hide comparison" : "Compare plans"), !compareOpen && /*#__PURE__*/React.createElement("span", {
+    className: "small muted"
+  }, "See the key differences side by side, with the full feature list one click away.")), compareOpen && /*#__PURE__*/React.createElement("div", {
+    ref: cmpRef,
+    className: "cmp-anchor"
+  }, /*#__PURE__*/React.createElement(Compare, {
+    s: s,
+    band: band,
+    recIdx: recIdx,
+    choosePlan: choosePlan,
+    openSales: openSales,
+    v2: v2,
+    onClose: () => setCompareOpen(false)
+  })), /*#__PURE__*/React.createElement("div", {
+    className: "foot-note"
+  }, /*#__PURE__*/React.createElement("span", null, "Prices exclude 7% VAT. Prices and features match empeo.com/pricing as of ", VERIFIED_DATE, "."), /*#__PURE__*/React.createElement("span", null, "Prefer to try first? empeo offers a 30-day free trial, no card needed.")));
+}
+
+/* ------------------------------------------------------------------ STEP 2: CONFIGURE */
+function ConfigureStep({
+  s,
+  set,
+  q,
+  next,
+  back
+}) {
+  const band = bandFor(s.employees);
+  const plan = PLANS.find(p => p.id === s.planId);
+  const nextBand = band ? BANDS.find(b => b.min === band.max + 1) : null;
+  const toggleAddon = id => set({
+    addons: s.addons.includes(id) ? s.addons.filter(x => x !== id) : [...s.addons, id]
+  });
+  const nextBandDelta = nextBand ? bandAnnual(plan, nextBand) - bandAnnual(plan, band) : 0;
+  return /*#__PURE__*/React.createElement("div", {
+    className: "layout"
+  }, /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("div", {
+    className: "page-head"
+  }, /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("h1", null, "Set up ", plan.name), /*#__PURE__*/React.createElement("p", null, "Pick how often you pay, how many employees you'll manage, and any add-ons. The total on the right updates as you go."))), /*#__PURE__*/React.createElement("section", {
+    className: "panel",
+    "aria-labelledby": "bp-h"
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "panel-head"
+  }, /*#__PURE__*/React.createElement("h2", {
+    id: "bp-h"
+  }, "Billing period"), /*#__PURE__*/React.createElement("p", null, "Longer periods cost less per month.")), /*#__PURE__*/React.createElement("div", {
+    className: "billing-opts",
+    role: "radiogroup",
+    "aria-labelledby": "bp-h"
+  }, Object.entries(BILLING).map(([k, v]) => {
+    const pc = band ? planCharge(plan, band, k) : null;
+    return /*#__PURE__*/React.createElement("button", {
+      key: k,
+      className: "bopt",
+      role: "radio",
+      "aria-checked": s.billing === k,
+      onClick: () => set({
+        billing: k
+      })
+    }, /*#__PURE__*/React.createElement("span", {
+      className: "b-t"
+    }, v.label, v.save && /*#__PURE__*/React.createElement("span", {
+      className: "chip ok"
+    }, v.save)), pc && /*#__PURE__*/React.createElement("span", {
+      className: "b-p"
+    }, thb(pc.charge), " / ", v.per), pc && /*#__PURE__*/React.createElement("span", {
+      className: "b-s"
+    }, "\u2248 ", thb0(pc.charge / pc.months), "/month for the plan"));
+  }))), /*#__PURE__*/React.createElement("section", {
+    className: "panel",
+    "aria-labelledby": "emp-h"
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "panel-head"
+  }, /*#__PURE__*/React.createElement("h2", {
+    id: "emp-h"
+  }, "Employees"), /*#__PURE__*/React.createElement("p", null, "Count everyone who will clock in, take leave or get paid in empeo.")), /*#__PURE__*/React.createElement(HeadcountSlider, {
+    id: "hc2",
+    value: s.employees,
+    onChange: v => set({
+      employees: v
+    })
+  }), band && /*#__PURE__*/React.createElement("div", {
+    className: "band-bar"
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "band-meta"
+  }, /*#__PURE__*/React.createElement("span", {
+    id: "hc2-note"
+  }, "Price band ", band.min, "\u2013", band.max, " \xB7 ", band.max - s.employees > 0 ? `${band.max - s.employees} more employees at no extra cost` : "you're at the top of this band"), nextBand && /*#__PURE__*/React.createElement("span", null, "At ", nextBand.min, "+ employees: plan +", thb0(nextBandDelta), "/year"))), !band && /*#__PURE__*/React.createElement("div", {
+    className: "alert info",
+    style: {
+      marginTop: 14,
+      marginBottom: 0
+    }
+  }, /*#__PURE__*/React.createElement("span", {
+    className: "a-icon"
+  }, /*#__PURE__*/React.createElement(Icon, {
+    d: I.info,
+    size: 20
+  })), /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("h3", null, "Over 500 employees needs a custom quote"), /*#__PURE__*/React.createElement("p", null, "Sales will price your plan and rollout. You can lower the number to keep buying online.")))), /*#__PURE__*/React.createElement("section", {
+    className: "panel",
+    "aria-labelledby": "ad-h"
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "panel-head"
+  }, /*#__PURE__*/React.createElement("h2", {
+    id: "ad-h"
+  }, "Add-ons"), /*#__PURE__*/React.createElement("p", null, "Optional. Priced per user per month, billed with your plan.")), /*#__PURE__*/React.createElement("div", {
+    className: "addons"
+  }, ADDONS.map(a => {
+    const inc = a.includedIn.includes(s.planId);
+    const on = !inc && s.addons.includes(a.id);
+    const months = BILLING[s.billing].months;
+    return /*#__PURE__*/React.createElement("label", {
+      key: a.id,
+      className: "addon" + (on ? " on" : "") + (inc ? " included" : "")
+    }, /*#__PURE__*/React.createElement("input", {
+      type: "checkbox",
+      checked: inc || on,
+      disabled: inc,
+      onChange: () => toggleAddon(a.id)
+    }), /*#__PURE__*/React.createElement("span", null, /*#__PURE__*/React.createElement("span", {
+      className: "a-name"
+    }, a.name), /*#__PURE__*/React.createElement("span", {
+      className: "a-desc",
+      style: {
+        display: "block"
+      }
+    }, a.desc)), /*#__PURE__*/React.createElement("span", {
+      className: "a-price"
+    }, inc ? /*#__PURE__*/React.createElement("span", {
+      className: "chip ok"
+    }, "Included in ", plan.name) : /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement("b", {
+      className: "num"
+    }, "+", thb(a.price * s.employees * months)), "\u0E3F", a.price, "/user/month")));
+  }))), /*#__PURE__*/React.createElement("div", {
+    className: "back-row"
+  }, /*#__PURE__*/React.createElement("button", {
+    className: "btn ghost",
+    onClick: back
+  }, /*#__PURE__*/React.createElement(Icon, {
+    d: I.back
+  }), " Back to plans"))), /*#__PURE__*/React.createElement(Summary, {
+    q: q,
+    step: 1,
+    onContinue: next,
+    continueLabel: "Review order",
+    continueDisabled: !q,
+    onEdit: back
+  }));
+}
+
+/* ------------------------------------------------------------------ STEP 3: REVIEW */
+function Field({
+  k,
+  label,
+  hint,
+  full,
+  children,
+  tried,
+  errs
+}) {
+  return /*#__PURE__*/React.createElement("div", {
+    className: "field" + (full ? " full" : "") + (tried && errs[k] ? " invalid" : "")
+  }, /*#__PURE__*/React.createElement("label", {
+    htmlFor: "f-" + k
+  }, label), children, tried && errs[k] ? /*#__PURE__*/React.createElement("span", {
+    className: "err",
+    role: "alert"
+  }, errs[k]) : hint && /*#__PURE__*/React.createElement("span", {
+    className: "hint"
+  }, hint));
+}
+function ReviewStep({
+  s,
+  set,
+  q,
+  next,
+  back
+}) {
+  const [tried, setTried] = useState(false);
+  const c = s.company;
+  const upd = k => e => set({
+    company: {
+      ...c,
+      [k]: e.target.value
+    }
+  });
+  const errs = {
+    name: !c.name.trim() && "Enter your company's registered name.",
+    taxId: !/^\d{13}$/.test(c.taxId.replace(/\D/g, "")) && "Tax ID must be 13 digits.",
+    address: !c.address.trim() && "Enter the address for your tax invoice.",
+    email: !/^\S+@\S+\.\S+$/.test(c.email) && "Enter a valid email for invoices.",
+    terms: !s.terms && "Accept the terms to continue."
+  };
+  const ok = !Object.values(errs).some(Boolean);
+  const go = () => {
+    setTried(true);
+    if (ok) next();
+  };
+  return /*#__PURE__*/React.createElement("div", {
+    className: "layout"
+  }, /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("div", {
+    className: "page-head"
+  }, /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("h1", null, "Review your order"), /*#__PURE__*/React.createElement("p", null, "Check the price breakdown, then add the details we need for your tax invoice."))), /*#__PURE__*/React.createElement("section", {
+    className: "panel",
+    "aria-labelledby": "rv-h"
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "panel-head"
+  }, /*#__PURE__*/React.createElement("h2", {
+    id: "rv-h"
+  }, "What you're buying"), /*#__PURE__*/React.createElement("button", {
+    className: "link small",
+    onClick: back
+  }, "Edit")), /*#__PURE__*/React.createElement("dl", {
+    className: "receipt"
+  }, /*#__PURE__*/React.createElement("dt", null, "Plan"), /*#__PURE__*/React.createElement("dd", null, "empeo ", q.plan.name), /*#__PURE__*/React.createElement("dt", null, "Employees"), /*#__PURE__*/React.createElement("dd", null, q.employees, " (band ", q.band.min, "\u2013", q.band.max, ")"), /*#__PURE__*/React.createElement("dt", null, "Billing"), /*#__PURE__*/React.createElement("dd", null, BILLING[q.billing].label, ", renews ", fmtDate(q.renew)), /*#__PURE__*/React.createElement("dt", null, "Add-ons"), /*#__PURE__*/React.createElement("dd", null, q.addonLines.length ? q.addonLines.map(a => a.name).join(", ") : "None"))), /*#__PURE__*/React.createElement("section", {
+    className: "panel",
+    "aria-labelledby": "bd-h"
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "panel-head"
+  }, /*#__PURE__*/React.createElement("h2", {
+    id: "bd-h"
+  }, "Billing details"), /*#__PURE__*/React.createElement(Sample, null, "Sample company")), /*#__PURE__*/React.createElement("div", {
+    className: "form-grid"
+  }, /*#__PURE__*/React.createElement(Field, {
+    tried: tried,
+    errs: errs,
+    k: "name",
+    label: "Company name",
+    full: true
+  }, /*#__PURE__*/React.createElement("input", {
+    id: "f-name",
+    value: c.name,
+    onChange: upd("name"),
+    autoComplete: "organization"
+  })), /*#__PURE__*/React.createElement(Field, {
+    tried: tried,
+    errs: errs,
+    k: "taxId",
+    label: "Tax ID",
+    hint: "13-digit tax identification number"
+  }, /*#__PURE__*/React.createElement("input", {
+    id: "f-taxId",
+    value: c.taxId,
+    onChange: upd("taxId"),
+    inputMode: "numeric"
+  })), /*#__PURE__*/React.createElement("div", {
+    className: "field"
+  }, /*#__PURE__*/React.createElement("label", {
+    htmlFor: "f-branch"
+  }, "Branch"), /*#__PURE__*/React.createElement("select", {
+    id: "f-branch",
+    value: c.branch,
+    onChange: upd("branch")
+  }, /*#__PURE__*/React.createElement("option", null, "Head office"), /*#__PURE__*/React.createElement("option", null, "Branch 00001"), /*#__PURE__*/React.createElement("option", null, "Branch 00002"))), /*#__PURE__*/React.createElement(Field, {
+    tried: tried,
+    errs: errs,
+    k: "address",
+    label: "Address for tax invoice",
+    full: true
+  }, /*#__PURE__*/React.createElement("input", {
+    id: "f-address",
+    value: c.address,
+    onChange: upd("address"),
+    autoComplete: "street-address"
+  })), /*#__PURE__*/React.createElement(Field, {
+    tried: tried,
+    errs: errs,
+    k: "contact",
+    label: "Billing contact"
+  }, /*#__PURE__*/React.createElement("input", {
+    id: "f-contact",
+    value: c.contact,
+    onChange: upd("contact"),
+    autoComplete: "name"
+  })), /*#__PURE__*/React.createElement(Field, {
+    tried: tried,
+    errs: errs,
+    k: "email",
+    label: "Invoice email",
+    hint: "Receipts and tax invoices go here"
+  }, /*#__PURE__*/React.createElement("input", {
+    id: "f-email",
+    type: "email",
+    value: c.email,
+    onChange: upd("email"),
+    autoComplete: "email"
+  }))), /*#__PURE__*/React.createElement("div", {
+    style: {
+      marginTop: 16
+    },
+    className: tried && errs.terms ? "field invalid" : "field"
+  }, /*#__PURE__*/React.createElement("label", {
+    className: "check"
+  }, /*#__PURE__*/React.createElement("input", {
+    type: "checkbox",
+    checked: s.terms,
+    onChange: e => set({
+      terms: e.target.checked
+    })
+  }), /*#__PURE__*/React.createElement("span", null, "I agree to the Terms of Service and Privacy Policy, and understand the plan renews automatically every ", BILLING[q.billing].per, ".")), tried && errs.terms && /*#__PURE__*/React.createElement("span", {
+    className: "err",
+    role: "alert"
+  }, errs.terms))), /*#__PURE__*/React.createElement("div", {
+    className: "back-row"
+  }, /*#__PURE__*/React.createElement("button", {
+    className: "btn ghost",
+    onClick: back
+  }, /*#__PURE__*/React.createElement(Icon, {
+    d: I.back
+  }), " Back to setup"))), /*#__PURE__*/React.createElement(Summary, {
+    q: q,
+    step: 2,
+    onContinue: go,
+    continueLabel: "Continue to payment"
+  }));
+}
+
+/* ------------------------------------------------------------------ STEP 4: PAYMENT */
+const TEST_OK = "4242 4242 4242 4242";
+const TEST_DECLINE = "4000 0000 0000 0002";
+const cardBrand = n => /^4/.test(n) ? "Visa" : /^5[1-5]/.test(n) ? "Mastercard" : /^35/.test(n) ? "JCB" : "";
+const groupCard = v => v.replace(/\D/g, "").slice(0, 16).replace(/(.{4})/g, "$1 ").trim();
+function CopyBtn({
+  text,
+  onCopied
+}) {
+  return /*#__PURE__*/React.createElement("button", {
+    type: "button",
+    className: "copy",
+    onClick: () => {
+      try {
+        navigator.clipboard.writeText(text).then(() => onCopied("Copied"), () => onCopied("Couldn't copy. Select the text instead."));
+      } catch (e) {
+        onCopied("Couldn't copy. Select the text instead.");
+      }
+    }
+  }, "Copy");
+}
+function CardForm({
+  q,
+  s,
+  set,
+  onPaid,
+  toast
+}) {
+  const card = s.card;
+  const [tried, setTried] = useState(false);
+  const [status, setStatus] = useState("idle"); // idle | processing | declined
+  const numRef = useRef(null);
+  const digits = card.number.replace(/\D/g, "");
+  const errs = {
+    name: !card.name.trim() && "Enter the name on the card.",
+    number: digits.length !== 16 && "Card number must be 16 digits.",
+    exp: !/^(0[1-9]|1[0-2])\/\d{2}$/.test(card.exp) && "Use MM/YY.",
+    cvc: !/^\d{3,4}$/.test(card.cvc) && "3 or 4 digits on the back."
+  };
+  const valid = !Object.values(errs).some(Boolean);
+  const upd = (k, f = v => v) => e => {
+    set({
+      card: {
+        ...card,
+        [k]: f(e.target.value)
+      }
+    });
+  };
+  const pay = e => {
+    e.preventDefault();
+    setTried(true);
+    if (!valid) return;
+    setStatus("processing");
+    setTimeout(() => {
+      if (digits.endsWith("0002")) {
+        setStatus("declined");
+        set({
+          declines: s.declines + 1
+        });
+      } else {
+        setStatus("idle");
+        onPaid({
+          method: "card",
+          last4: digits.slice(-4),
+          brand: cardBrand(digits) || "Card"
+        });
+      }
+    }, 1400);
+  };
+  const retryNewCard = () => {
+    setStatus("idle");
+    setTried(false);
+    set({
+      card: {
+        ...card,
+        number: "",
+        exp: "",
+        cvc: ""
+      }
+    });
+    setTimeout(() => numRef.current && numRef.current.focus(), 0);
+  };
+  return /*#__PURE__*/React.createElement("form", {
+    onSubmit: pay,
+    noValidate: true
+  }, status === "declined" && /*#__PURE__*/React.createElement("div", {
+    className: "alert err",
+    role: "alert",
+    tabIndex: -1,
+    ref: el => el && el.focus()
+  }, /*#__PURE__*/React.createElement("span", {
+    className: "a-icon"
+  }, /*#__PURE__*/React.createElement(Icon, {
+    d: I.alert,
+    size: 22
+  })), /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("h3", null, "Your card was declined"), /*#__PURE__*/React.createElement("p", null, "The bank that issued your ", cardBrand(digits) || "card", " ending ", digits.slice(-4), " declined this payment of ", thb(q.total), ". You haven't been charged. This often happens when a card has a spending limit or online payments turned off."), /*#__PURE__*/React.createElement("div", {
+    className: "a-actions"
+  }, /*#__PURE__*/React.createElement("button", {
+    type: "button",
+    className: "btn primary",
+    onClick: retryNewCard
+  }, "Try another card"), /*#__PURE__*/React.createElement("button", {
+    type: "button",
+    className: "btn secondary",
+    onClick: () => {
+      setStatus("idle");
+      set({
+        method: "bank"
+      });
+    }
+  }, "Pay by bank transfer")))), /*#__PURE__*/React.createElement("div", {
+    className: "form-grid"
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "field full" + (tried && errs.name ? " invalid" : "")
+  }, /*#__PURE__*/React.createElement("label", {
+    htmlFor: "c-name"
+  }, "Name on card"), /*#__PURE__*/React.createElement("input", {
+    id: "c-name",
+    value: card.name,
+    onChange: upd("name"),
+    autoComplete: "cc-name"
+  }), tried && errs.name && /*#__PURE__*/React.createElement("span", {
+    className: "err"
+  }, errs.name)), /*#__PURE__*/React.createElement("div", {
+    className: "field full" + (tried && errs.number ? " invalid" : "")
+  }, /*#__PURE__*/React.createElement("label", {
+    htmlFor: "c-num"
+  }, "Card number"), /*#__PURE__*/React.createElement("div", {
+    className: "card-input"
+  }, /*#__PURE__*/React.createElement("input", {
+    id: "c-num",
+    ref: numRef,
+    className: "mono",
+    value: card.number,
+    onChange: upd("number", groupCard),
+    inputMode: "numeric",
+    autoComplete: "cc-number",
+    placeholder: "1234 5678 9012 3456"
+  }), /*#__PURE__*/React.createElement("span", {
+    className: "brand-tag"
+  }, cardBrand(digits))), tried && errs.number && /*#__PURE__*/React.createElement("span", {
+    className: "err"
+  }, errs.number)), /*#__PURE__*/React.createElement("div", {
+    className: "field" + (tried && errs.exp ? " invalid" : "")
+  }, /*#__PURE__*/React.createElement("label", {
+    htmlFor: "c-exp"
+  }, "Expiry"), /*#__PURE__*/React.createElement("input", {
+    id: "c-exp",
+    className: "mono",
+    value: card.exp,
+    placeholder: "MM/YY",
+    autoComplete: "cc-exp",
+    inputMode: "numeric",
+    onChange: upd("exp", v => {
+      const d = v.replace(/\D/g, "").slice(0, 4);
+      return d.length > 2 ? d.slice(0, 2) + "/" + d.slice(2) : d;
+    })
+  }), tried && errs.exp && /*#__PURE__*/React.createElement("span", {
+    className: "err"
+  }, errs.exp)), /*#__PURE__*/React.createElement("div", {
+    className: "field" + (tried && errs.cvc ? " invalid" : "")
+  }, /*#__PURE__*/React.createElement("label", {
+    htmlFor: "c-cvc"
+  }, "Security code (CVC)"), /*#__PURE__*/React.createElement("input", {
+    id: "c-cvc",
+    className: "mono",
+    value: card.cvc,
+    onChange: upd("cvc", v => v.replace(/\D/g, "").slice(0, 4)),
+    inputMode: "numeric",
+    autoComplete: "cc-csc",
+    placeholder: "123"
+  }), tried && errs.cvc && /*#__PURE__*/React.createElement("span", {
+    className: "err"
+  }, errs.cvc))), /*#__PURE__*/React.createElement("div", {
+    style: {
+      marginTop: 18,
+      display: "grid",
+      gap: 8
+    }
+  }, /*#__PURE__*/React.createElement("button", {
+    className: "btn primary lg block",
+    type: "submit",
+    disabled: status === "processing"
+  }, status === "processing" ? /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement("span", {
+    className: "spinner",
+    "aria-hidden": "true"
+  }), " Processing payment\u2026") : /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement(Icon, {
+    d: I.lock
+  }), " Pay ", thb(q.total))), /*#__PURE__*/React.createElement("p", {
+    className: "small muted",
+    style: {
+      textAlign: "center"
+    }
+  }, "Your card is charged ", thb(q.total), " now, then again on ", fmtDate(q.renew), " unless you cancel.")), /*#__PURE__*/React.createElement("div", {
+    className: "test-cards"
+  }, /*#__PURE__*/React.createElement(Sample, null, "Prototype"), /*#__PURE__*/React.createElement("span", null, "Test cards:"), /*#__PURE__*/React.createElement("button", {
+    type: "button",
+    className: "link",
+    onClick: () => {
+      setStatus("idle");
+      set({
+        card: {
+          ...card,
+          number: TEST_OK,
+          exp: "12/28",
+          cvc: "123"
+        }
+      });
+    }
+  }, /*#__PURE__*/React.createElement("code", null, TEST_OK), " succeeds"), /*#__PURE__*/React.createElement("button", {
+    type: "button",
+    className: "link",
+    onClick: () => {
+      setStatus("idle");
+      set({
+        card: {
+          ...card,
+          number: TEST_DECLINE,
+          exp: "12/28",
+          cvc: "123"
+        }
+      });
+    }
+  }, /*#__PURE__*/React.createElement("code", null, TEST_DECLINE), " declines")));
+}
+function BankForm({
+  q,
+  s,
+  set,
+  onPaid,
+  orderNo,
+  toast
+}) {
+  const slip = s.slip; // {state:'idle'|'error'|'uploading'|'ready', name, size, url, progress, error}
+  const [over, setOver] = useState(false);
+  const inputRef = useRef(null);
+  const timer = useRef(null);
+  useEffect(() => () => clearInterval(timer.current), []);
+  const accept = (file, trusted) => {
+    if (!file) return;
+    const okType = trusted || /^(image\/(jpeg|png)|application\/pdf)$/.test(file.type);
+    if (!okType) return set({
+      slip: {
+        state: "error",
+        error: `"${file.name}" isn't a JPG, PNG or PDF. Upload a photo or PDF of your transfer slip.`
+      }
+    });
+    if (file.size > 5 * 1024 * 1024) return set({
+      slip: {
+        state: "error",
+        error: `"${file.name}" is ${(file.size / 1048576).toFixed(1)} MB. Files must be 5 MB or smaller.`
+      }
+    });
+    const url = file.type.startsWith("image/") ? URL.createObjectURL(file) : null;
+    let p = 0;
+    const base = {
+      name: file.name,
+      size: file.size,
+      url,
+      isPdf: file.type === "application/pdf"
+    };
+    set({
+      slip: {
+        ...base,
+        state: "uploading",
+        progress: 0
+      }
+    });
+    clearInterval(timer.current);
+    timer.current = setInterval(() => {
+      p += 12;
+      if (p >= 100) {
+        clearInterval(timer.current);
+        set({
+          slip: {
+            ...base,
+            state: "ready",
+            progress: 100
+          }
+        });
+      } else set({
+        slip: {
+          ...base,
+          state: "uploading",
+          progress: p
+        }
+      });
+    }, 90);
+  };
+  const remove = () => {
+    clearInterval(timer.current);
+    set({
+      slip: {
+        state: "idle"
+      }
+    });
+  };
+  const kb = n => n > 1048576 ? (n / 1048576).toFixed(1) + " MB" : Math.max(1, Math.round(n / 1024)) + " KB";
+  return /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("ol", {
+    className: "bank-steps"
+  }, /*#__PURE__*/React.createElement("li", null, /*#__PURE__*/React.createElement("span", {
+    className: "n"
+  }, "1"), /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("h3", null, "Transfer the exact amount"), /*#__PURE__*/React.createElement("dl", {
+    className: "kv"
+  }, /*#__PURE__*/React.createElement("dt", null, "Amount"), /*#__PURE__*/React.createElement("dd", {
+    className: "num"
+  }, thb(q.total)), /*#__PURE__*/React.createElement(CopyBtn, {
+    text: q.total.toFixed(2),
+    onCopied: toast
+  }), /*#__PURE__*/React.createElement("dt", null, "Reference"), /*#__PURE__*/React.createElement("dd", {
+    className: "mono"
+  }, orderNo), /*#__PURE__*/React.createElement(CopyBtn, {
+    text: orderNo,
+    onCopied: toast
+  })), /*#__PURE__*/React.createElement("p", {
+    className: "small muted",
+    style: {
+      marginTop: 6
+    }
+  }, "Put the reference in the transfer note so we can match your payment faster."))), /*#__PURE__*/React.createElement("li", null, /*#__PURE__*/React.createElement("span", {
+    className: "n"
+  }, "2"), /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("h3", {
+    style: {
+      display: "flex",
+      gap: 8,
+      alignItems: "center",
+      flexWrap: "wrap"
+    }
+  }, "To this account ", /*#__PURE__*/React.createElement(Sample, null, "Sample bank details")), /*#__PURE__*/React.createElement("dl", {
+    className: "kv"
+  }, /*#__PURE__*/React.createElement("dt", null, "Bank"), /*#__PURE__*/React.createElement("dd", null, "Kasikornbank"), /*#__PURE__*/React.createElement("span", null), /*#__PURE__*/React.createElement("dt", null, "Account name"), /*#__PURE__*/React.createElement("dd", null, "Gofive Co., Ltd."), /*#__PURE__*/React.createElement("span", null), /*#__PURE__*/React.createElement("dt", null, "Account no."), /*#__PURE__*/React.createElement("dd", {
+    className: "mono"
+  }, "000-0-00000-0"), /*#__PURE__*/React.createElement(CopyBtn, {
+    text: "000-0-00000-0",
+    onCopied: toast
+  })))), /*#__PURE__*/React.createElement("li", null, /*#__PURE__*/React.createElement("span", {
+    className: "n"
+  }, "3"), /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("h3", null, "Upload your transfer slip"), /*#__PURE__*/React.createElement("input", {
+    ref: inputRef,
+    id: "slip-input",
+    type: "file",
+    accept: "image/jpeg,image/png,application/pdf",
+    className: "sr-only",
+    onChange: e => {
+      accept(e.target.files[0]);
+      e.target.value = "";
+    }
+  }), (slip.state === "idle" || slip.state === "error") && /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement("label", {
+    htmlFor: "slip-input",
+    className: "drop" + (over ? " over" : "") + (slip.state === "error" ? " bad" : ""),
+    onDragOver: e => {
+      e.preventDefault();
+      setOver(true);
+    },
+    onDragLeave: () => setOver(false),
+    onDrop: e => {
+      e.preventDefault();
+      setOver(false);
+      accept(e.dataTransfer.files[0]);
+    },
+    tabIndex: 0,
+    onKeyDown: e => {
+      if (e.key === "Enter" || e.key === " ") {
+        e.preventDefault();
+        inputRef.current.click();
+      }
+    }
+  }, /*#__PURE__*/React.createElement(Icon, {
+    d: I.upload,
+    size: 26
+  }), /*#__PURE__*/React.createElement("b", null, "Drop your slip here or ", /*#__PURE__*/React.createElement("span", {
+    style: {
+      color: "var(--accent)",
+      textDecoration: "underline"
+    }
+  }, "browse")), /*#__PURE__*/React.createElement("span", {
+    className: "d-sub"
+  }, "JPG, PNG or PDF, up to 5 MB")), slip.state === "error" && /*#__PURE__*/React.createElement("p", {
+    className: "err small",
+    role: "alert",
+    style: {
+      color: "var(--err)",
+      marginTop: 6
+    }
+  }, slip.error)), (slip.state === "uploading" || slip.state === "ready") && /*#__PURE__*/React.createElement("div", {
+    className: "file-row" + (slip.state === "uploading" ? " loading" : ""),
+    "aria-live": "polite"
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "thumb"
+  }, slip.url ? /*#__PURE__*/React.createElement("img", {
+    src: slip.url,
+    alt: "Transfer slip preview"
+  }) : slip.isPdf ? "PDF" : /*#__PURE__*/React.createElement(Icon, {
+    d: I.file,
+    size: 22
+  })), /*#__PURE__*/React.createElement("div", {
+    style: {
+      minWidth: 0
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontWeight: 600,
+      overflow: "hidden",
+      textOverflow: "ellipsis",
+      whiteSpace: "nowrap"
+    }
+  }, slip.name), slip.state === "uploading" ? /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement("div", {
+    className: "small muted"
+  }, "Uploading\u2026 ", slip.progress, "%"), /*#__PURE__*/React.createElement("div", {
+    className: "progress"
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      width: slip.progress + "%"
+    }
+  }))) : /*#__PURE__*/React.createElement("div", {
+    className: "small",
+    style: {
+      color: "var(--ok)",
+      display: "flex",
+      gap: 4,
+      alignItems: "center"
+    }
+  }, /*#__PURE__*/React.createElement(Icon, {
+    d: I.check,
+    size: 14,
+    stroke: 3
+  }), " Uploaded \xB7 ", kb(slip.size))), /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: "flex",
+      gap: 4
+    }
+  }, slip.state === "ready" && /*#__PURE__*/React.createElement("button", {
+    className: "btn ghost small",
+    onClick: () => inputRef.current.click()
+  }, "Replace"), /*#__PURE__*/React.createElement("button", {
+    className: "icon-btn",
+    "aria-label": "Remove slip",
+    onClick: remove
+  }, /*#__PURE__*/React.createElement(Icon, {
+    d: I.x,
+    size: 14
+  })))), slip.state === "idle" && /*#__PURE__*/React.createElement("button", {
+    type: "button",
+    className: "link small",
+    style: {
+      marginTop: 8
+    },
+    onClick: () => {
+      const svg = `<svg xmlns='http://www.w3.org/2000/svg' width='240' height='360'><rect width='240' height='360' fill='#eaf6ef'/><text x='20' y='60' font-family='sans-serif' font-size='18' fill='#11764a'>Transfer successful</text><text x='20' y='110' font-family='sans-serif' font-size='14' fill='#333'>${thb(q.total)}</text><text x='20' y='140' font-family='sans-serif' font-size='12' fill='#666'>Ref ${orderNo}</text><text x='20' y='330' font-family='sans-serif' font-size='11' fill='#999'>SAMPLE SLIP</text></svg>`;
+      const blob = new Blob([svg], {
+        type: "image/svg+xml"
+      });
+      const f = new File([blob], "sample-transfer-slip.svg", {
+        type: "image/svg+xml"
+      });
+      accept(f, true);
+    }
+  }, "No slip handy? Use a sample slip")))), /*#__PURE__*/React.createElement("div", {
+    style: {
+      marginTop: 20,
+      display: "grid",
+      gap: 8
+    }
+  }, /*#__PURE__*/React.createElement("button", {
+    className: "btn primary lg block",
+    disabled: slip.state !== "ready",
+    onClick: () => onPaid({
+      method: "bank"
+    })
+  }, "Submit slip for review"), /*#__PURE__*/React.createElement("p", {
+    className: "small muted",
+    style: {
+      textAlign: "center"
+    }
+  }, slip.state === "ready" ? "We'll check the transfer and email you when your plan is active." : "Upload your slip to submit. You can also come back to this order later.")));
+}
+function PaymentStep({
+  s,
+  set,
+  q,
+  onPaid,
+  back,
+  orderNo,
+  toast
+}) {
+  return /*#__PURE__*/React.createElement("div", {
+    className: "layout"
+  }, /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("div", {
+    className: "page-head"
+  }, /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("h1", null, "Payment"), /*#__PURE__*/React.createElement("p", null, "Pay by card to start right away, or transfer from your company bank account and upload the slip.")), /*#__PURE__*/React.createElement("span", {
+    className: "secure"
+  }, /*#__PURE__*/React.createElement(Icon, {
+    d: I.lock,
+    size: 14
+  }), " Encrypted checkout")), /*#__PURE__*/React.createElement("section", {
+    className: "panel"
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "methods",
+    role: "radiogroup",
+    "aria-label": "Payment method"
+  }, /*#__PURE__*/React.createElement("button", {
+    className: "method",
+    role: "radio",
+    "aria-checked": s.method === "card",
+    onClick: () => set({
+      method: "card"
+    })
+  }, /*#__PURE__*/React.createElement("span", {
+    className: "m-icon"
+  }, /*#__PURE__*/React.createElement(Icon, {
+    d: I.card,
+    size: 20
+  })), /*#__PURE__*/React.createElement("span", null, /*#__PURE__*/React.createElement("span", {
+    className: "m-t"
+  }, "Credit or debit card"), /*#__PURE__*/React.createElement("span", {
+    className: "m-s",
+    style: {
+      display: "block"
+    }
+  }, "Visa, Mastercard, JCB \xB7 active immediately"))), /*#__PURE__*/React.createElement("button", {
+    className: "method",
+    role: "radio",
+    "aria-checked": s.method === "bank",
+    onClick: () => set({
+      method: "bank"
+    })
+  }, /*#__PURE__*/React.createElement("span", {
+    className: "m-icon"
+  }, /*#__PURE__*/React.createElement(Icon, {
+    d: I.bank,
+    size: 20
+  })), /*#__PURE__*/React.createElement("span", null, /*#__PURE__*/React.createElement("span", {
+    className: "m-t"
+  }, "Bank transfer"), /*#__PURE__*/React.createElement("span", {
+    className: "m-s",
+    style: {
+      display: "block"
+    }
+  }, "Upload slip \xB7 active after review")))), s.method === "card" ? /*#__PURE__*/React.createElement(CardForm, {
+    q: q,
+    s: s,
+    set: set,
+    onPaid: onPaid,
+    toast: toast
+  }) : /*#__PURE__*/React.createElement(BankForm, {
+    q: q,
+    s: s,
+    set: set,
+    onPaid: onPaid,
+    orderNo: orderNo,
+    toast: toast
+  })), /*#__PURE__*/React.createElement("div", {
+    className: "back-row"
+  }, /*#__PURE__*/React.createElement("button", {
+    className: "btn ghost",
+    onClick: back
+  }, /*#__PURE__*/React.createElement(Icon, {
+    d: I.back
+  }), " Back to review"), /*#__PURE__*/React.createElement("span", {
+    className: "small muted"
+  }, "Questions about paying? Call sales ", /*#__PURE__*/React.createElement(Sample, null, "Sample"), " 02-000-0000"))), /*#__PURE__*/React.createElement(Summary, {
+    q: q,
+    step: 3
+  }));
+}
+
+/* ------------------------------------------------------------------ STEP 5: DONE */
+function DoneStep({
+  q,
+  s,
+  result,
+  orderNo,
+  restart,
+  toast
+}) {
+  const pending = result.method === "bank";
+  const now = new Date();
+  return /*#__PURE__*/React.createElement("div", {
+    className: "done-wrap"
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "done-hero"
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "big-icon " + (pending ? "wait" : "ok")
+  }, /*#__PURE__*/React.createElement(Icon, {
+    d: pending ? I.clock : I.check,
+    size: 32,
+    stroke: 2.5
+  })), pending ? /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement("span", {
+    className: "chip warn"
+  }, "Payment under review"), /*#__PURE__*/React.createElement("h1", null, "We've got your transfer slip"), /*#__PURE__*/React.createElement("p", null, "Our billing team checks transfers within 1 business day ", /*#__PURE__*/React.createElement(Sample, null, "Sample SLA"), ". We'll email ", s.company.email, " as soon as empeo ", q.plan.name, " is active. You don't need to do anything else.")) : /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement("span", {
+    className: "chip ok"
+  }, "Payment successful"), /*#__PURE__*/React.createElement("h1", null, "Welcome to empeo ", q.plan.name), /*#__PURE__*/React.createElement("p", null, "Your plan is active. We charged ", thb(q.total), " to your ", result.brand, " ending ", result.last4, " and sent the receipt and tax invoice to ", s.company.email, "."))), /*#__PURE__*/React.createElement("div", {
+    className: "done-grid"
+  }, /*#__PURE__*/React.createElement("section", {
+    className: "panel"
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "panel-head"
+  }, /*#__PURE__*/React.createElement("h2", null, pending ? "Order status" : "Receipt"), /*#__PURE__*/React.createElement("span", {
+    className: "mono small muted"
+  }, orderNo)), pending ? /*#__PURE__*/React.createElement("ol", {
+    className: "timeline"
+  }, /*#__PURE__*/React.createElement("li", null, /*#__PURE__*/React.createElement("span", {
+    className: "t-dot ok"
+  }, /*#__PURE__*/React.createElement(Icon, {
+    d: I.check,
+    size: 12,
+    stroke: 3
+  })), /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("b", null, "Order placed"), /*#__PURE__*/React.createElement("div", {
+    className: "t-sub"
+  }, fmtDate(now)))), /*#__PURE__*/React.createElement("li", null, /*#__PURE__*/React.createElement("span", {
+    className: "t-dot ok"
+  }, /*#__PURE__*/React.createElement(Icon, {
+    d: I.check,
+    size: 12,
+    stroke: 3
+  })), /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("b", null, "Slip received"), /*#__PURE__*/React.createElement("div", {
+    className: "t-sub"
+  }, s.slip.name))), /*#__PURE__*/React.createElement("li", null, /*#__PURE__*/React.createElement("span", {
+    className: "t-dot now"
+  }, /*#__PURE__*/React.createElement(Icon, {
+    d: I.clock,
+    size: 12,
+    stroke: 3
+  })), /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("b", null, "Checking your transfer of ", thb(q.total)), /*#__PURE__*/React.createElement("div", {
+    className: "t-sub"
+  }, "Usually within 1 business day"))), /*#__PURE__*/React.createElement("li", null, /*#__PURE__*/React.createElement("span", {
+    className: "t-dot"
+  }), /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("b", null, "Plan activated"), /*#__PURE__*/React.createElement("div", {
+    className: "t-sub"
+  }, "We'll email the receipt and tax invoice")))) : /*#__PURE__*/React.createElement("dl", {
+    className: "receipt"
+  }, /*#__PURE__*/React.createElement("dt", null, q.plan.name, " plan, ", BILLING[q.billing].label.toLowerCase()), /*#__PURE__*/React.createElement("dd", null, thb(q.list)), q.discount > 0 && /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement("dt", null, BILLING[q.billing].label, " discount"), /*#__PURE__*/React.createElement("dd", {
+    style: {
+      color: "var(--ok)"
+    }
+  }, "\u2212", thb(q.discount))), q.addonLines.map(a => /*#__PURE__*/React.createElement(React.Fragment, {
+    key: a.id
+  }, /*#__PURE__*/React.createElement("dt", null, a.name), /*#__PURE__*/React.createElement("dd", null, thb(a.amount)))), /*#__PURE__*/React.createElement("dt", null, "VAT 7%"), /*#__PURE__*/React.createElement("dd", null, thb(q.vat)), /*#__PURE__*/React.createElement("dt", null, /*#__PURE__*/React.createElement("b", null, "Paid")), /*#__PURE__*/React.createElement("dd", null, /*#__PURE__*/React.createElement("b", null, thb(q.total))), /*#__PURE__*/React.createElement("dt", null, "Next payment"), /*#__PURE__*/React.createElement("dd", null, fmtDate(q.renew)))), /*#__PURE__*/React.createElement("section", {
+    className: "panel"
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "panel-head"
+  }, /*#__PURE__*/React.createElement("h2", null, pending ? "While you wait" : "Next steps")), /*#__PURE__*/React.createElement("ul", {
+    className: "next-list"
+  }, /*#__PURE__*/React.createElement("li", null, /*#__PURE__*/React.createElement(Icon, {
+    d: I.users,
+    size: 18
+  }), /*#__PURE__*/React.createElement("span", null, /*#__PURE__*/React.createElement("b", null, "Import your employees"), /*#__PURE__*/React.createElement("br", null), /*#__PURE__*/React.createElement("span", {
+    className: "muted small"
+  }, "Upload a spreadsheet or add people one by one. ", pending ? "You can start setting up now." : ""))), /*#__PURE__*/React.createElement("li", null, /*#__PURE__*/React.createElement(Icon, {
+    d: I.sliders,
+    size: 18
+  }), /*#__PURE__*/React.createElement("span", null, /*#__PURE__*/React.createElement("b", null, "Set up shifts and leave policies"), /*#__PURE__*/React.createElement("br", null), /*#__PURE__*/React.createElement("span", {
+    className: "muted small"
+  }, "Use Thai labor-law defaults and adjust from there."))), /*#__PURE__*/React.createElement("li", null, /*#__PURE__*/React.createElement(Icon, {
+    d: I.phone,
+    size: 18
+  }), /*#__PURE__*/React.createElement("span", null, /*#__PURE__*/React.createElement("b", null, "Book an onboarding call"), /*#__PURE__*/React.createElement("br", null), /*#__PURE__*/React.createElement("span", {
+    className: "muted small"
+  }, q.employees <= 100 ? "Implementation is free for your team size." : "Sales will contact you about implementation.")))), /*#__PURE__*/React.createElement("div", {
+    className: "push-end",
+    style: {
+      display: "grid",
+      gap: 8
+    }
+  }, /*#__PURE__*/React.createElement("button", {
+    className: "btn primary block",
+    onClick: () => toast("End of prototype. This would open the empeo workspace.")
+  }, "Go to my workspace"), /*#__PURE__*/React.createElement("button", {
+    className: "btn ghost block",
+    onClick: restart
+  }, "Start a new purchase")))));
+}
+
+/* ------------------------------------------------------------------ SALES DIALOG (v2 + >500) */
+function SalesDialog({
+  planId,
+  employees,
+  onClose,
+  onAlt
+}) {
+  const [sent, setSent] = useState(false);
+  const [f, setF] = useState({
+    name: "",
+    email: "",
+    phone: "",
+    employees,
+    note: ""
+  });
+  const [tried, setTried] = useState(false);
+  const ref = useRef(null);
+  useEffect(() => {
+    const k = e => e.key === "Escape" && onClose();
+    document.addEventListener("keydown", k);
+    ref.current && ref.current.querySelector("input, button").focus();
+    return () => document.removeEventListener("keydown", k);
+  }, []);
+  const plan = PLANS.find(p => p.id === planId);
+  const errs = {
+    name: !f.name.trim(),
+    email: !/^\S+@\S+\.\S+$/.test(f.email)
+  };
+  const submit = e => {
+    e.preventDefault();
+    setTried(true);
+    if (!errs.name && !errs.email) setSent(true);
+  };
+  return /*#__PURE__*/React.createElement("div", {
+    className: "overlay",
+    onMouseDown: e => e.target === e.currentTarget && onClose()
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "dialog",
+    role: "dialog",
+    "aria-modal": "true",
+    "aria-labelledby": "sd-h",
+    ref: ref
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "d-head"
+  }, /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("h2", {
+    id: "sd-h"
+  }, sent ? "Thanks, we'll be in touch" : employees > 500 ? "Get a custom quote" : `Get ${plan ? plan.name : "custom"} pricing`), !sent && /*#__PURE__*/React.createElement("p", {
+    className: "muted small",
+    style: {
+      marginTop: 4
+    }
+  }, "A sales specialist will prepare a quote for your headcount, rollout and integrations.")), /*#__PURE__*/React.createElement("button", {
+    className: "icon-btn",
+    "aria-label": "Close",
+    onClick: onClose
+  }, /*#__PURE__*/React.createElement(Icon, {
+    d: I.x,
+    size: 16
+  }))), sent ? /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: "grid",
+      gap: 14
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "alert ok",
+    style: {
+      margin: 0
+    }
+  }, /*#__PURE__*/React.createElement("span", {
+    className: "a-icon"
+  }, /*#__PURE__*/React.createElement(Icon, {
+    d: I.check,
+    size: 20,
+    stroke: 3
+  })), /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("h3", null, "Request sent"), /*#__PURE__*/React.createElement("p", null, "Sales will contact ", f.email, " within 1 business day ", /*#__PURE__*/React.createElement(Sample, null, "Sample SLA"), " with a quote for ", f.employees, " employees."))), employees <= 500 && /*#__PURE__*/React.createElement("p", {
+    className: "small muted"
+  }, "Need to start sooner? Pro+ covers goals, engagement and timesheets, and you can buy it online today."), /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: "flex",
+      gap: 8,
+      flexWrap: "wrap"
+    }
+  }, /*#__PURE__*/React.createElement("button", {
+    className: "btn primary",
+    onClick: onClose
+  }, "Done"), employees <= 500 && /*#__PURE__*/React.createElement("button", {
+    className: "btn secondary",
+    onClick: onAlt
+  }, "Buy Pro+ online"))) : /*#__PURE__*/React.createElement("form", {
+    onSubmit: submit,
+    noValidate: true,
+    className: "form-grid"
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "field" + (tried && errs.name ? " invalid" : "")
+  }, /*#__PURE__*/React.createElement("label", {
+    htmlFor: "s-name"
+  }, "Your name"), /*#__PURE__*/React.createElement("input", {
+    id: "s-name",
+    value: f.name,
+    onChange: e => setF({
+      ...f,
+      name: e.target.value
+    })
+  }), tried && errs.name && /*#__PURE__*/React.createElement("span", {
+    className: "err"
+  }, "Enter your name.")), /*#__PURE__*/React.createElement("div", {
+    className: "field" + (tried && errs.email ? " invalid" : "")
+  }, /*#__PURE__*/React.createElement("label", {
+    htmlFor: "s-email"
+  }, "Work email"), /*#__PURE__*/React.createElement("input", {
+    id: "s-email",
+    type: "email",
+    value: f.email,
+    onChange: e => setF({
+      ...f,
+      email: e.target.value
+    })
+  }), tried && errs.email && /*#__PURE__*/React.createElement("span", {
+    className: "err"
+  }, "Enter a valid work email.")), /*#__PURE__*/React.createElement("div", {
+    className: "field"
+  }, /*#__PURE__*/React.createElement("label", {
+    htmlFor: "s-phone"
+  }, "Phone (optional)"), /*#__PURE__*/React.createElement("input", {
+    id: "s-phone",
+    value: f.phone,
+    onChange: e => setF({
+      ...f,
+      phone: e.target.value
+    })
+  })), /*#__PURE__*/React.createElement("div", {
+    className: "field"
+  }, /*#__PURE__*/React.createElement("label", {
+    htmlFor: "s-emp"
+  }, "Employees"), /*#__PURE__*/React.createElement("input", {
+    id: "s-emp",
+    type: "number",
+    value: f.employees,
+    onChange: e => setF({
+      ...f,
+      employees: e.target.value
+    })
+  })), /*#__PURE__*/React.createElement("div", {
+    className: "field full"
+  }, /*#__PURE__*/React.createElement("label", {
+    htmlFor: "s-note"
+  }, "What do you need? (optional)"), /*#__PURE__*/React.createElement("textarea", {
+    id: "s-note",
+    rows: "3",
+    value: f.note,
+    onChange: e => setF({
+      ...f,
+      note: e.target.value
+    }),
+    placeholder: "For example: SSO, Open API, multiple companies"
+  })), /*#__PURE__*/React.createElement("div", {
+    className: "full",
+    style: {
+      display: "flex",
+      gap: 8,
+      flexWrap: "wrap"
+    }
+  }, /*#__PURE__*/React.createElement("button", {
+    className: "btn primary",
+    type: "submit"
+  }, "Request a quote"), /*#__PURE__*/React.createElement("button", {
+    className: "btn ghost",
+    type: "button",
+    onClick: onClose
+  }, "Cancel")))));
+}
+
+/* ------------------------------------------------------------------ APP */
+const initial = () => ({
+  step: 0,
+  maxStep: 0,
+  planId: null,
+  needs: [],
+  helper: true,
+  employees: 50,
+  billing: "annual",
+  addons: [],
+  company: {
+    name: "Siam Bloom Co., Ltd.",
+    taxId: "0105561234567",
+    branch: "Head office",
+    address: "88 Sukhumvit Rd, Khlong Toei, Bangkok 10110",
+    contact: "Nattaya Srisuk",
+    email: "finance@siambloom.co.th"
+  },
+  terms: false,
+  method: "card",
+  card: {
+    name: "Nattaya Srisuk",
+    number: TEST_DECLINE,
+    exp: "12/28",
+    cvc: "123"
+  },
+  slip: {
+    state: "idle"
+  },
+  declines: 0,
+  result: null
+});
+function App() {
+  const [s, setS] = useState(initial);
+  const [v2, setV2] = useState(false);
+  const [sales, setSales] = useState(null);
+  const [toastMsg, setToastMsg] = useState(null);
+  const [ctrlOpen, setCtrlOpen] = useState(false);
+  const [orderNo] = useState(() => "EMP-" + new Date().toISOString().slice(2, 10).replace(/-/g, "") + "-" + String(Math.floor(1000 + Math.random() * 9000)));
+  const set = useCallback(patch => setS(p => ({
+    ...p,
+    ...(typeof patch === "function" ? patch(p) : patch)
+  })), []);
+  const toast = useCallback(m => {
+    setToastMsg(m);
+    clearTimeout(window.__t);
+    window.__t = setTimeout(() => setToastMsg(null), 2600);
+  }, []);
+  const go = step => {
+    setS(p => ({
+      ...p,
+      step,
+      maxStep: Math.max(p.maxStep, step)
+    }));
+    window.scrollTo({
+      top: 0,
+      behavior: "smooth"
+    });
+  };
+  const q = useMemo(() => s.planId ? computeQuote(s) : null, [s.planId, s.employees, s.billing, s.addons]);
+
+  // Requirement v2: Enterprise leaves self-service. Pull users back to plans if they're mid-checkout on it.
+  useEffect(() => {
+    if (v2 && s.planId === "ent" && s.step > 0 && s.step < 4) {
+      set({
+        step: 0,
+        maxStep: 0,
+        planId: null
+      });
+      toast("Enterprise now goes through Sales. Choose another plan or talk to Sales.");
+    }
+  }, [v2]);
+  // >500 employees mid-checkout: send back to plans
+  useEffect(() => {
+    if (s.step > 1 && s.step < 4 && !bandFor(s.employees)) go(1);
+  }, [s.employees]);
+  const choosePlan = id => {
+    set({
+      planId: id
+    });
+    go(1);
+  };
+  const onPaid = result => {
+    set({
+      result
+    });
+    go(4);
+  };
+  const restart = () => {
+    setS(initial());
+    window.scrollTo({
+      top: 0
+    });
+  };
+  return /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement("div", {
+    className: "proto-banner",
+    role: "note"
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "wrap"
+  }, /*#__PURE__*/React.createElement("b", null, "Design exam prototype"), /*#__PURE__*/React.createElement("span", null, "Not an official empeo page. No real payments. Plan and add-on prices are from empeo.com/pricing (", VERIFIED_DATE, "); anything tagged ", /*#__PURE__*/React.createElement(Sample, null), " is illustrative."))), /*#__PURE__*/React.createElement("header", {
+    className: "top"
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "wrap"
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "brand"
+  }, /*#__PURE__*/React.createElement("span", {
+    className: "wordmark"
+  }, /*#__PURE__*/React.createElement(Icon, {
+    d: I.people,
+    size: 26,
+    stroke: 0,
+    fill: "currentColor"
+  }), "empeo"), /*#__PURE__*/React.createElement("small", null, "Checkout")), /*#__PURE__*/React.createElement(Stepper, {
+    step: s.step,
+    maxStep: s.maxStep,
+    go: go
+  }), /*#__PURE__*/React.createElement("span", {
+    className: "secure"
+  }, /*#__PURE__*/React.createElement(Icon, {
+    d: I.lock,
+    size: 14
+  }), " Secure checkout"))), /*#__PURE__*/React.createElement("main", null, /*#__PURE__*/React.createElement("div", {
+    className: "wrap"
+  }, s.step === 0 && /*#__PURE__*/React.createElement(PlanStep, {
+    s: s,
+    set: set,
+    choosePlan: choosePlan,
+    openSales: id => setSales(id),
+    v2: v2
+  }), s.step === 1 && s.planId && /*#__PURE__*/React.createElement(ConfigureStep, {
+    s: s,
+    set: set,
+    q: q,
+    next: () => q && go(2),
+    back: () => go(0)
+  }), s.step === 2 && q && /*#__PURE__*/React.createElement(ReviewStep, {
+    s: s,
+    set: set,
+    q: q,
+    next: () => go(3),
+    back: () => go(1)
+  }), s.step === 3 && q && /*#__PURE__*/React.createElement(PaymentStep, {
+    s: s,
+    set: set,
+    q: q,
+    onPaid: onPaid,
+    back: () => go(2),
+    orderNo: orderNo,
+    toast: toast
+  }), s.step === 4 && q && /*#__PURE__*/React.createElement(DoneStep, {
+    q: q,
+    s: s,
+    result: s.result,
+    orderNo: orderNo,
+    restart: restart,
+    toast: toast
+  }))), sales && /*#__PURE__*/React.createElement(SalesDialog, {
+    planId: sales,
+    employees: s.employees,
+    onClose: () => setSales(null),
+    onAlt: () => {
+      setSales(null);
+      choosePlan("proplus");
+    }
+  }), toastMsg && /*#__PURE__*/React.createElement("div", {
+    className: "toast",
+    role: "status"
+  }, toastMsg), /*#__PURE__*/React.createElement("div", {
+    className: "proto-ctrl"
+  }, ctrlOpen && /*#__PURE__*/React.createElement("div", {
+    className: "pc-panel",
+    role: "region",
+    "aria-label": "Prototype controls"
+  }, /*#__PURE__*/React.createElement("b", null, "Prototype controls"), /*#__PURE__*/React.createElement("label", {
+    className: "toggle"
+  }, /*#__PURE__*/React.createElement("input", {
+    type: "checkbox",
+    checked: v2,
+    onChange: e => setV2(e.target.checked)
+  }), /*#__PURE__*/React.createElement("span", {
+    className: "sw"
+  }), /*#__PURE__*/React.createElement("span", null, /*#__PURE__*/React.createElement("b", null, "Requirement change v2"), /*#__PURE__*/React.createElement("br", null), /*#__PURE__*/React.createElement("span", {
+    className: "muted small"
+  }, "Enterprise shows \"Custom pricing\" and leads to Sales instead of checkout."))), /*#__PURE__*/React.createElement("div", {
+    className: "small muted"
+  }, "The card form is pre-filled with the decline test card so you can see the error state first. Use the links under the form to switch cards. Set employees above 500 to see the custom-quote path."), /*#__PURE__*/React.createElement("button", {
+    className: "btn secondary",
+    onClick: () => {
+      restart();
+      setCtrlOpen(false);
+    }
+  }, "Restart flow")), /*#__PURE__*/React.createElement("button", {
+    className: "pc-btn",
+    onClick: () => setCtrlOpen(!ctrlOpen),
+    "aria-expanded": ctrlOpen
+  }, /*#__PURE__*/React.createElement(Icon, {
+    d: I.sliders,
+    size: 14
+  }), " ", ctrlOpen ? "Close" : "Prototype controls")));
+}
+ReactDOM.createRoot(document.getElementById("root")).render( /*#__PURE__*/React.createElement(App, null));
+</script>
+</body>
+</html>
